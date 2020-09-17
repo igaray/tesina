@@ -1,0 +1,97 @@
+\documentclass[10pt, a4paper]{report}
+\usepackage[utf8]{inputenc}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=cyan,
+}
+
+\title{Tesina}
+\author{Iñaki Garay}
+\date{Septiembre 2020}
+
+\begin{document}
+
+\begin{titlepage}
+\maketitle
+\end{titlepage}
+
+\tableofcontents
+
+\section*{Introducción / Motivación}
+
+\begin{itemize}[noitemsep]
+\item Los compiladores tradicionales tienen una arquitectura de pipeline.
+\item Los editores modernos usan LSP (Language Server Protocol).
+\item Una implementacion de LSP require de componentes de compiladores (especialmente analisis).
+\item La arquitectura de pipeline no se adapta bien a estos requerimientos modernos de reducir tiempos de compilacion y de proveer informacion online durante edicion.
+\item Estos objetivos puede ser logrados mediante compilacion incremental.
+\item La compilacion incremental puede ser lograda mediante una arquitectura basada en queries.
+\item La arquitectura basada en queries es implementada tomando inspiracion de build systems.
+\item Rust-analyzer es la segunda implementacion de LSP para rust.
+\item Porque no funciono la primera iteracion?
+\item Rust-Analyzer usa una libreria, Salsa, para cachear las queries parciales.
+\item Como funciona Salsa?
+\end{itemize}
+
+\section*{Metas vs Mecanismo}
+
+\subsection*{Arquitectura Basada en Consultas}
+
+\subsection*{Caso de Estudio: Rustc}
+
+\subsection*{Caso de Estudio: Rust-analyzer}
+
+\subsection*{Salsa}
+
+\section*{Fuentes y Referencias}
+
+\begin{itemize}[noitemsep]
+\item \href{https://www.youtube.com/watch?v=wSdV1M7n4gQ}{Youtube: Anders Hejlsberg on Modern Compiler Construction}
+\item \href{https://en.wikipedia.org/wiki/Incremental_compiler}{Wikipedia: Incremental Compiler}
+\item \href{https://www.microsoft.com/en-us/research/publication/build-systems-la-carte/}{Build Systems A La Carte}
+\item \href{https://www.youtube.com/watch?v=b_T-eCToX1I}{Youtube: 2016 LLVM Developers’ Meeting: D. Dunbar “A New Architecture for Building Software”}
+\item \href{https://dl.acm.org/doi/10.1145/502949.502889}{An approach to incremental compilation}
+\item \href{https://ollef.github.io/blog/posts/query-based-compilers.html}{Olle Fredriksson: Query-based compiler architectures}
+\item \href{https://blog.rust-lang.org/2016/09/08/incremental.html}{Rust Blog: Incremental Compilation}
+\item Rustc Dev Guide
+	\begin{itemize}[noitemsep]
+	\item \href{https://rustc-dev-guide.rust-lang.org/overview.html}{Overview of the Compiler}
+	\item \href{https://rustc-dev-guide.rust-lang.org/compiler-src.html}{High-level overview of the compiler source}
+	\item \href{https://rustc-dev-guide.rust-lang.org/query.html}{Queries: demand-driven compilation}
+		\begin{itemize}[noitemsep]
+		\item \href{https://rustc-dev-guide.rust-lang.org/queries/query-evaluation-model-in-detail.html}{The Query Evaluation Model in Detail}
+		\item \href{https://rustc-dev-guide.rust-lang.org/queries/incremental-compilation.html}{Incremental compilation}
+		\item \href{https://rustc-dev-guide.rust-lang.org/queries/incremental-compilation-in-detail.html}{Incremental Compilation In Detail}
+		\item \href{https://rustc-dev-guide.rust-lang.org/incrcomp-debugging.html}{Debugging and Testing Dependencies}
+		\item \href{https://rustc-dev-guide.rust-lang.org/queries/profiling.html}{Profiling Queries}
+		\item \href{https://rustc-dev-guide.rust-lang.org/salsa.html}{How Salsa works}
+		\end{itemize}
+	\item \href{}{}
+	\end{itemize}
+\item Rust Analyzer
+	\begin{itemize}[noitemsep]
+	\item \href{https://rust-analyzer.github.io/}{Rust Analyzer}
+	\item \href{https://rust-analyzer.github.io/manual.html}{Manual}
+	\item \href{https://rust-analyzer.github.io/blog}{Blog}
+	\item \href{https://youtu.be/ANKBNiSWyfc}{Youtube: Rust-Analyzer Guide}
+	\item \href{https://github.com/rust-analyzer/rust-analyzer/tree/master/docs/dev}{rust-analyzer/tree/master/docs/dev}
+	\item \href{https://ferrous-systems.com/blog/rust-analyzer-2019/}{Rust Analyzer in 2018 and 2019}
+	\item \href{https://ferrous-systems.com/blog/rust-analyzer-status-opencollective/}{Status of rust-analyzer}
+	\item \href{https://www.youtube.com/playlist?list=PLXajQV_H-DxLMBt0amcuxgTeOTj6L-YGl}{Youtube: Rust Analyzer Q\&A}
+	\item \href{https://blog.logrocket.com/intro-to-rust-analyzer/}{2020 Intro to Rust Analyzer}
+	\item \href{https://dev.to/bnjjj/what-i-learned-contributing-to-rust-analyzer-4c7e}{2020 What I learned contributing to Rust-Analyzer}
+	\end{itemize}
+\item \href{https://salsa-rs.github.io/salsa/}{The Salsa Book}
+\item \href{https://www.youtube.com/playlist?list=PL85XCvVPmGQh0P_VEPVM2ZIlBwl4MQMNY}{Youtube: Incremental Compilation Working Group}
+\item \href{https://www.youtube.com/watch?v=N6b44kMS6OM}{Youtube: Responsive compilers - Nicholas Matsakis - PLISS 2019}
+\item \href{https://www.youtube.com/watch?v=LIYkT3p5gTs}{Youtube: Things I Learned (TIL) - Nicholas Matsakis - PLISS 2019}
+\item \href{https://www.youtube.com/watch?v=_muY4HjSqVw}{Youtube: How Salsa Works (2019.01)}
+\item \href{https://www.youtube.com/watch?v=i_IhACacPRY}{Salsa In More Depth (2019.01)}
+\item \href{https://www.youtube.com/watch?v=Xr-rBqLr-G4}{RLS 2.0, Salsa, and Name Resolution}
+\end{itemize}
+
+\end{document}
