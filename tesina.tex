@@ -220,16 +220,16 @@ Normalmente esto no es un problema, dado que la optimización del código genera
   name-resolved definition and type check it, returning its type.
 
 -
-	```
-	fetchType :: QualifiedName -> IO Type
-	fetchType (QualifiedName moduleName name) = do
-	  fileName <- moduleFileName moduleName
-	  sourceCode <- readFile fileName
-	  parsedModule <- parseModule sourceCode
-	  resolvedModule <- resolveNames parsedModule
-	  let definition = lookup name resolvedModule
-	  inferDefinitionType definition
-	```
+```
+fetchType :: QualifiedName -> IO Type
+fetchType (QualifiedName moduleName name) = do
+fileName <- moduleFileName moduleName
+sourceCode <- readFile fileName
+parsedModule <- parseModule sourceCode
+resolvedModule <- resolveNames parsedModule
+let definition = lookup name resolvedModule
+inferDefinitionType definition
+```
 
 - Let's first refactor the code into smaller functions:
 
@@ -253,25 +253,25 @@ Normalmente esto no es un problema, dado que la optimización del código genera
 
 \begin{verbatim}
 - **Why Incremental Compilation in the First Place?**
-	- Much of a programmer's time is spent in an edit-compile-debug workflow:
-		- you make a small change (often in a single module or even function),
-		- you let the compiler translate the code into a binary, and finally
-		- you run the program or a bunch of unit tests in order to see results
-		  of the change.
-	- After that it's back to step one, making the next small change informed by
-	  the knowledge gained in the previous iteration.
-	  This essential feedback loop is at the core of our daily work.
-	  We want the time being stalled while waiting for the compiler to produce
-	  an executable program to be as short as possible.
-	- Incremental compilation is a way of exploiting the fact that little
-	  changes between compiles during the regular programming workflow:
-	  Many, if not most, of the changes done in between two compilation sessions
-	  only have local impact on the machine code in the output binary, while the
-	  rest of the program, same as at the source level, will end up exactly the
-	  same, bit for bit.
-	  Incremental compilation aims at retaining as much of those unchanged parts
-	  as possible while redoing only that amount of work that actually must be
-	  redone.
+- Much of a programmer's time is spent in an edit-compile-debug workflow:
+	- you make a small change (often in a single module or even function),
+	- you let the compiler translate the code into a binary, and finally
+	- you run the program or a bunch of unit tests in order to see results
+ of the change.
+- After that it's back to step one, making the next small change informed by
+the knowledge gained in the previous iteration.
+This essential feedback loop is at the core of our daily work.
+We want the time being stalled while waiting for the compiler to produce
+an executable program to be as short as possible.
+- Incremental compilation is a way of exploiting the fact that little
+changes between compiles during the regular programming workflow:
+Many, if not most, of the changes done in between two compilation sessions
+only have local impact on the machine code in the output binary, while the
+rest of the program, same as at the source level, will end up exactly the
+same, bit for bit.
+Incremental compilation aims at retaining as much of those unchanged parts
+as possible while redoing only that amount of work that actually must be
+redone.
 \end{verbatim}
 
 \begin{verbatim}
@@ -631,19 +631,17 @@ Se puede definir mas de un grupo para separar las queries en componentes.
 \section*{Fuentes y Referencias}
 
 \begin{itemize}[noitemsep]
-\item \href{https://www.youtube.com/watch?v=wSdV1M7n4gQ}{\Square Youtube: Anders Hejlsberg on Modern Compiler Construction}
-
-\item \href{https://en.wikipedia.org/wiki/Incremental_compiler}{\CheckedBox Wikipedia: Incremental Compiler}
-
-\item \href{https://www.microsoft.com/en-us/research/publication/build-systems-la-carte/}{\Square Build Systems A La Carte}
-
-\item \href{https://www.youtube.com/watch?v=b_T-eCToX1I}{\Square Youtube: 2016 LLVM Developers’ Meeting: D. Dunbar “A New Architecture for Building Software”}
-
-\item \href{https://dl.acm.org/doi/10.1145/502949.502889}{\Square An approach to incremental compilation}
-
-\item \href{https://ollef.github.io/blog/posts/query-based-compilers.html}{\CheckedBox Olle Fredriksson: Query-based compiler architectures}
-
-\item \href{https://blog.rust-lang.org/2016/09/08/incremental.html}{\CheckedBox Rust Blog: Incremental Compilation}
+	
+\item General
+	\begin{itemize}[noitemsep]
+	\item \href{https://www.youtube.com/watch?v=wSdV1M7n4gQ}{\CheckedBox Youtube: Anders Hejlsberg on Modern Compiler Construction}
+	\item \href{https://en.wikipedia.org/wiki/Incremental_compiler}{\CheckedBox Wikipedia: Incremental Compiler}
+	\item \href{https://ollef.github.io/blog/posts/query-based-compilers.html}{\CheckedBox Olle Fredriksson: Query-based compiler architectures}
+	\item \href{https://blog.rust-lang.org/2016/09/08/incremental.html}{\CheckedBox Rust Blog: Incremental Compilation}
+	\item \href{https://www.microsoft.com/en-us/research/publication/build-systems-la-carte/}{\Square Build Systems A La Carte}
+	\item \href{https://www.youtube.com/watch?v=b_T-eCToX1I}{\Square Youtube: 2016 LLVM Developers’ Meeting: D. Dunbar “A New Architecture for Building Software”}
+	\item \href{https://dl.acm.org/doi/10.1145/502949.502889}{\Square An approach to incremental compilation}
+	\end{itemize}
 
 \item Rustc Dev Guide
 	\begin{itemize}[noitemsep]
@@ -659,26 +657,35 @@ Se puede definir mas de un grupo para separar las queries en componentes.
 		\item \href{https://rustc-dev-guide.rust-lang.org/salsa.html}{\Square How Salsa works}
 		\end{itemize}
 	\end{itemize}
+
 \item Rust Analyzer
 	\begin{itemize}[noitemsep]
 	\item \href{https://rust-analyzer.github.io/}{\Square Rust Analyzer}
 	\item \href{https://rust-analyzer.github.io/manual.html}{\Square Manual}
 	\item \href{https://rust-analyzer.github.io/blog}{\Square Blog}
-	\item \href{https://youtu.be/ANKBNiSWyfc}{\Square Youtube: Rust-Analyzer Guide}
 	\item \href{https://github.com/rust-analyzer/rust-analyzer/tree/master/docs/dev}{\Square rust-analyzer/tree/master/docs/dev}
 	\item \href{https://ferrous-systems.com/blog/rust-analyzer-2019/}{\Square Rust Analyzer in 2018 and 2019}
 	\item \href{https://ferrous-systems.com/blog/rust-analyzer-status-opencollective/}{\Square Status of rust-analyzer}
-	\item \href{https://www.youtube.com/playlist?list=PLXajQV_H-DxLMBt0amcuxgTeOTj6L-YGl}{\Square Youtube: Rust Analyzer Q\&A}
 	\item \href{https://blog.logrocket.com/intro-to-rust-analyzer/}{\Square 2020 Intro to Rust Analyzer}
 	\item \href{https://dev.to/bnjjj/what-i-learned-contributing-to-rust-analyzer-4c7e}{\Square 2020 What I learned contributing to Rust-Analyzer}
+	\item \href{https://www.youtube.com/watch?v=7_7ckOKZCJE}{\Square Youtube: Are we *actually* IDE yet? A look on the Rust IDE Story - Igor Matuszewski}
+	\item \href{https://www.youtube.com/watch?v=ANKBNiSWyfc}{\Square Youtube: Rust analyzer guide}
+	\item \href{https://www.youtube.com/watch?v=DGAuLWdCCAI}{\Square Youtube: rust analyzer syntax trees}
+	\item \href{https://www.youtube.com/watch?v=Lmp3P9WNL8o}{\Square Youtube: rust-analyzer type-checker overview by flodiebold}
+	\item \href{https://www.youtube.com/playlist?list=PLXajQV_H-DxLMBt0amcuxgTeOTj6L-YGl}{\Square Youtube: Rust Analyzer Q\&A}
 	\end{itemize}
-\item \href{https://salsa-rs.github.io/salsa/}{\Square The Salsa Book}
-\item \href{https://www.youtube.com/playlist?list=PL85XCvVPmGQh0P_VEPVM2ZIlBwl4MQMNY}{\Square Youtube: Incremental Compilation Working Group}
-\item \href{https://www.youtube.com/watch?v=N6b44kMS6OM}{\Square Youtube: Responsive compilers - Nicholas Matsakis - PLISS 2019}
-\item \href{https://www.youtube.com/watch?v=LIYkT3p5gTs}{\Square Youtube: Things I Learned (TIL) - Nicholas Matsakis - PLISS 2019}
-\item \href{https://www.youtube.com/watch?v=_muY4HjSqVw}{\Square Youtube: How Salsa Works (2019.01)}
-\item \href{https://www.youtube.com/watch?v=i_IhACacPRY}{\Square Salsa In More Depth (2019.01)}
-\item \href{https://www.youtube.com/watch?v=Xr-rBqLr-G4}{\Square RLS 2.0, Salsa, and Name Resolution}
+
+\item Salsa
+	\begin{itemize}[noitemsep]
+	\item \href{https://salsa-rs.github.io/salsa/}{\Square The Salsa Book}
+	\item \href{https://www.youtube.com/playlist?list=PL85XCvVPmGQh0P_VEPVM2ZIlBwl4MQMNY}{\Square Youtube: Incremental Compilation Working Group}
+	\item \href{https://www.youtube.com/watch?v=N6b44kMS6OM}{\Square Youtube: Responsive compilers - Nicholas Matsakis - PLISS 2019}
+	\item \href{https://www.youtube.com/watch?v=LIYkT3p5gTs}{\Square Youtube: Things I Learned (TIL) - Nicholas Matsakis - PLISS 2019}
+	\item \href{https://www.youtube.com/watch?v=_muY4HjSqVw}{\Square Youtube: How Salsa Works (2019.01)}
+	\item \href{https://www.youtube.com/watch?v=i_IhACacPRY}{\Square Youtube: Salsa In More Depth (2019.01)}
+	\item \href{https://www.youtube.com/watch?v=Xr-rBqLr-G4}{\Square Youtube: RLS 2.0, Salsa, and Name Resolution}
+	\end{itemize}
+
 \item Rust Compilation Speed
 	\begin{itemize}[noitemsep]
 	\item \href{https://vfoley.xyz/rust-compile-speed-tips/}{\Square How to alleviate the pain of Rust compile times}
@@ -699,6 +706,18 @@ Se puede definir mas de un grupo para separar las queries en componentes.
 	\item \href{https://pingcap.com/blog/generics-and-compile-time-in-rust}{\Square PingCAP Blog: Generics and Compile-Time in Rust}
 	\item \href{https://pingcap.com/blog/rust-huge-compilation-units}{\Square PingCAP Blog: Rust's Huge Compilation Units}
 	\item \href{https://pingcap.com/blog/reasons-rust-compiles-slowly}{\Square PingCAP Blog: A Few More Reasons Rust Compiles Slowly}
+	\end{itemize}
+
+\item Miscellaneous
+	\begin{itemize}[noitemsep]
+	\item \href{https://www.youtube.com/watch?v=S2dK5lLFD_0}{\Square Youtube: Making Fast Incremental Compiler for Huge Codebase - Michał Bartkowiak - code::dive 2019}
+	\item \href{https://www.youtube.com/watch?v=JbS8a-Ba0Ck}{\Square Youtube: Starting with Semantics - Sylvan Clebsch - PLISS 2019}
+	\item \href{https://www.youtube.com/watch?v=mt6pIpt5Wk0}{\Square Youtube: Polyhedral Compilation as a Design Pattern for Compilers (1/2) - Albert Cohen - PLISS 2019}
+	\item \href{https://www.youtube.com/watch?v=3TNT5rFVTUY}{\Square Youtube: Polyhedral Compilation as a Design Pattern for Compilers (2/2) - Albert Cohen - PLISS 2019}
+	\item \href{https://www.youtube.com/watch?v=yvlhwZgUPG0}{\Square Youtube: First-Class Continuations: What and Why - Arjun Guha}
+	\item \href{https://www.youtube.com/watch?v=n_GhkL8GDAk}{\Square Youtube: Implementing First-Class Continuations by Source to Source Translation - Arjun Guha - PLISS 2019}
+	\item \href{https://www.youtube.com/watch?v=Lr4cMmaJHrg}{\Square Youtube: Static Program Analysis (part 1/2) - Anders Møller - PLISS 2019}
+	\item \href{https://www.youtube.com/watch?v=6QQSIIvH-F0}{\Square Youtube: Static Program Analysis (part 2/2) - Anders Møller - PLISS 2019}
 	\end{itemize}
 
 \end{itemize}
