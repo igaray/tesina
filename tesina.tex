@@ -628,10 +628,56 @@ Se puede definir mas de un grupo para separar las queries en componentes.
 	  encounters fewer false positives during cache invalidation.
 \end{verbatim}
 
+\section*{Source Notes}
+
+\subsection*{Build Systems a la Carte}
+
+\subsection*{2016 LLVM Developers’ Meeting: D. Dunbar “A New Architecture for Building Software”}
+
+Overview
+
+compile times impact developers
+clang was designed from the beginngin to be a very fast c/c++
+that was one of the motivations
+
+the strategy was
+- to have a tuned lex and parse implementation
+- focused heavily on having a low overhead -O0 path, no unnecesary optimizations on -O0, and do things such as fast instruction selection, etc
+- redesigned pch (pre compiled headers), try to pull the minimal amount of data from headers
+- integrated the assembler into the compiler, to avoid the time of emitting assembly code and loading it back into the assembler
+
+this proved succesful, clang was 3x faster than gcc
+but over time this lead has diminished
+in part because gcc itself got faster but mainly because
+
+performance regresses over time because features are added, and tuning can break
+
+improving compile time, options:
+- distributed compilation
+- improved caching, ideally distributed and shared
+- do less work
+
+there are things that in the case of clang could be done today, such as reuse the frontend for compiling several files sharing the same compile flags, allowing the frontend to better chache e.g. file stat calls and other metadata, or build pch for hotly edited files.
+while this works, the problem is that there is no control in the compiler over how it is invoked, as this depends on the build system
+one proposal is to build a compiler-service, but this presents other problems
+
+How we build software today
+
+for most languages, traditional unix/build system model
+- compiler runs as a separate process
+- primitive mechanisms for communicating dependencies between biuld systems and the compiler
+  - the build system tells us about our inputs andoutpus through command line arguemtns
+  - mechanism by which the compiler can write out additional dependencies the build system can ingest, we dont even have a real file format we use for that, we just write out a makefile format and force the build system to ingest it
+  - fixed input/output
+
+llbuild - a framework
+
+a new architecture for building software
+
 \section*{Fuentes y Referencias}
 
 \begin{itemize}[noitemsep]
-	
+
 \item General
 	\begin{itemize}[noitemsep]
 	\item \href{https://www.youtube.com/watch?v=wSdV1M7n4gQ}{\CheckedBox Youtube: Anders Hejlsberg on Modern Compiler Construction}
@@ -639,8 +685,9 @@ Se puede definir mas de un grupo para separar las queries en componentes.
 	\item \href{https://ollef.github.io/blog/posts/query-based-compilers.html}{\CheckedBox Olle Fredriksson: Query-based compiler architectures}
 	\item \href{https://blog.rust-lang.org/2016/09/08/incremental.html}{\CheckedBox Rust Blog: Incremental Compilation}
 	\item \href{https://www.microsoft.com/en-us/research/publication/build-systems-la-carte/}{\Square Build Systems A La Carte}
+  \item \href{https://dl.acm.org/doi/10.1145/502949.502889}{\CheckedBox An approach to incremental compilation}
+    This is old, from 1984.
 	\item \href{https://www.youtube.com/watch?v=b_T-eCToX1I}{\Square Youtube: 2016 LLVM Developers’ Meeting: D. Dunbar “A New Architecture for Building Software”}
-	\item \href{https://dl.acm.org/doi/10.1145/502949.502889}{\Square An approach to incremental compilation}
 	\end{itemize}
 
 \item Rustc Dev Guide
