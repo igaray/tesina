@@ -16,9 +16,10 @@ sorting=ynt
 \hypersetup{
     plainpages=false,
     colorlinks=true,
+    citecolor=blue,
     linkcolor=blue,
+    urlcolor=blue,
     filecolor=magenta,
-    urlcolor=cyan,
 }
 
 \title{Tesina}
@@ -39,8 +40,8 @@ sorting=ynt
 
 \newpage
 
-\addcontentsline{toc}{section}{Introducción / Esquema General}
-\section*{Introducción / Esquema General}
+\addcontentsline{toc}{chapter}{Introducción / Esquema General}
+\chapter*{Introducción / Esquema General}
 
 \begin{itemize}[noitemsep]
 
@@ -74,8 +75,8 @@ build systems.
 
 \end{itemize}
 
-\addcontentsline{toc}{section}{Motivaciones}
-\section*{Motivaciones}
+\addcontentsline{toc}{chapter}{Motivaciones}
+\chapter*{Motivaciones}
 
 Los compiladores ya no son cajas negras que ingestan un conjunto de archivos
 fuente y producen codigo ensamblador. De compiladores modernos se espera que:
@@ -83,7 +84,7 @@ fuente y producen codigo ensamblador. De compiladores modernos se espera que:
 \begin{itemize}[noitemsep]
 
 \item Sean incrementales, es decir, si se recompila el proyecto despues de
-producir modificaciones en el código fuente, solo se recompile lo que fue
+producir modificaciones en el código fuente, solo se recompila lo que fue
 afectado por esas modificaciones.
 
 \item Provean funcionalidad para editores, e.g. saltar a definición, encontrar
@@ -91,8 +92,8 @@ el tipo de una expresión en una ubicación dada, y mostrar errores al editar.
 
 \end{itemize}
 
-\addcontentsline{toc}{subsection}{Arquitecturas Tradicionales de Compiladores}
-\subsection*{Arquitecturas Tradicionales de Compiladores}
+\addcontentsline{toc}{section}{Arquitecturas Tradicionales de Compiladores [Olle20]}
+\section*{Arquitecturas Tradicionales de Compiladores [Olle20]}
 
 \noindent
 \includegraphics[width=\textwidth]{olle_trad_comp_arq}
@@ -107,31 +108,29 @@ se puede actualizar la tabla de tipos durante la fase de verificacion de tipado,
 para que mas adelante se pueda verificar el tipo de las entidades a las cuales
 el codigo se refiere. \cite{olle_query_based}
 
-\addcontentsline{toc}{subsection}{Language Server Protocol}
-\subsection*{Language Server Protocol}
+\addcontentsline{toc}{section}{Language Server Protocol}
+\section*{Language Server Protocol}
 
 El Language Server Protocol (LSP) es una protocolo abierto basado en JSON-RPC
-para el uso entre editores de codigo fuente o
+para el uso entre editores de codigo fuente o entornos de desarrollo integrados
+(IDE) y servidores que proveen funcionalidades especificas a lenguajes de
+programacion. El objetivo del protocolo es permitir que se implemente y
+distribuya el soporte para un lenguaje de programacion independientemente de un
+editor o IDE determinado.
+\cite{language_server_protocol}
 
-\begin{verbatim}
-The Language Server Protocol (LSP) is an open, JSON-RPC-
-based protocol for use between source code editors or
-integrated development environments (IDEs) and servers that
-provide programming language-specific features. The goal of
-the protocol is to allow programming language support to be
-implemented and distributed independently of any given
-editor or IDE.
-\end{verbatim}
+Implementar funcionalidad tal como autocompletado, ir a definicion, o mostrar
+documentacion relacionada a una entidad para un lenguaje de programacion
+determinado, requieren de esfuerzos significantes. Tradicionalmente este trabajo
+se debia repetir para cada herramienta de desarrollo, dado que cada herramienta
+proveia un API diferente al implementar la misma funcionalidad.
+\cite{language_server_protocol}
+
+Un Servidor de Lenguaje provee inteligencia especifica a un lenguaje y se
+comunica con herramientas de desarrollo
 \cite{language_server_protocol}
 
 \begin{verbatim}
-Adding features like auto complete, go to definition, or
-documentation on hover for a programming language takes
-significant effort.
-Traditionally this work had to be repeated for each
-development tool, as each tool provides different APIs for
-implementing the same feature.
-
 A Language Server is meant to provide the language-specific
 smarts and communicate with development tools over a
 protocol that enables inter-process communication.
@@ -142,9 +141,6 @@ development tools communicate.
 This way, a single Language Server can be re-used in
 multiple development tools, which in turn can support
 multiple languages with minimal effort.
-
-LSP is a win for both language providers and tooling
-vendors!
 \end{verbatim}
 \cite{language_server_protocol}
 
@@ -227,8 +223,8 @@ specifications or domain-specific languages (DSL).
 \end{verbatim}
 \cite{language_server_protocol_wiki}
 
-\addcontentsline{toc}{subsection}{Velocidad de Compilación}
-\subsection*{Velocidad de Compilación}
+\addcontentsline{toc}{section}{Velocidad de Compilación}
+\section*{Velocidad de Compilación}
 
 \begin{verbatim}
 - Improving compile times has actually been a major
@@ -246,11 +242,11 @@ edit-compile-debug cycle.
 \end{verbatim}
 \cite{rust_blog_incremental_compilation}
 
-\addcontentsline{toc}{section}{Mecanismos}
-\section*{Mecanismos}
+\addcontentsline{toc}{chapter}{Mecanismos}
+\chapter*{Mecanismos}
 
-\addcontentsline{toc}{subsection}{Compilación Incremental}
-\subsection*{Compilación Incremental}
+\addcontentsline{toc}{section}{Compilación Incremental}
+\section*{Compilación Incremental}
 
 La compilación incremental es una forma de computación incremental aplicada a la
 compilación.
@@ -281,8 +277,8 @@ se aplica solamente al producir un \textit{release build}, instancia en la cual
 se puede usar el compilador tradicional.
 \cite{wiki_incremental_compiler}
 
-\addcontentsline{toc}{subsection}{Arquitectura Basada en Queries \cite{olle_query_based}}
-\subsection*{Arquitectura Basada en Queries \cite{olle_query_based}}
+\addcontentsline{toc}{section}{Arquitectura Basada en Queries [Olle20]}
+\section*{Arquitectura Basada en Queries [Olle20]}
 
 \begin{verbatim}
 - Going from pipeline to queries
@@ -339,8 +335,8 @@ cache, indexed by the query.
 \end{verbatim}
 \cite{olle_query_based}
 
-\addcontentsline{toc}{subsection}{Why Incremental Compilation in the First Place? \cite{rust_blog_incremental_compilation}}
-\subsection*{Why Incremental Compilation in the First Place? \cite{rust_blog_incremental_compilation}}
+\addcontentsline{toc}{section}{Why Incremental Compilation in the First Place? [Woe16]}
+\section*{Why Incremental Compilation in the First Place? [Woe16]}
 
 \begin{verbatim}
 - Much of a programmer's time is spent in an
@@ -373,8 +369,8 @@ of work that actually must be redone.
 \end{verbatim}
 \cite{rust_blog_incremental_compilation}
 
-\addcontentsline{toc}{subsection}{How Do You Make Something "Incremental"? \cite{rust_blog_incremental_compilation}}
-\subsection*{How Do You Make Something "Incremental"? \cite{rust_blog_incremental_compilation}}
+\addcontentsline{toc}{section}{How Do You Make Something "Incremental"? [Woe16]}
+\section*{How Do You Make Something "Incremental"? [Woe16}
 
 \begin{verbatim}
 - We have already heard that computing something
@@ -394,8 +390,8 @@ particular intermediate result again.
 \end{verbatim}
 \cite{rust_blog_incremental_compilation}
 
-\addcontentsline{toc}{subsection}{An Incremental Compiler \cite{rust_blog_incremental_compilation}}
-\subsection*{An Incremental Compiler \cite{rust_blog_incremental_compilation}}
+\addcontentsline{toc}{section}{An Incremental Compiler [Woe16]}
+\section*{An Incremental Compiler [Woe16]}
 
 \begin{verbatim}
 - The way we chose to implement incrementality in the Rust
@@ -432,8 +428,8 @@ to re-compute it because of some changed input.
 \end{verbatim}
 \cite{rust_blog_incremental_compilation}
 
-\addcontentsline{toc}{subsection}{Seguimiento de Dependencias \cite{olle_query_based}}
-\subsection*{Seguimiento de Dependencias \cite{olle_query_based}}
+\addcontentsline{toc}{section}{Seguimiento de Dependencias [Olle20]}
+\section*{Seguimiento de Dependencias [Olle20]}
 
 \begin{verbatim}
 - Rock, Shake, Salsa
@@ -490,8 +486,8 @@ return something of type Type.
 \end{verbatim}
 \cite{olle_query_based}
 
-\addcontentsline{toc}{subsection}{Indexed queries \cite{olle_query_based}}
-\subsection*{Indexed queries \cite{olle_query_based}}
+\addcontentsline{toc}{section}{Indexed queries [Olle20]}
+\section*{Indexed queries [Olle20]}
 
 \begin{verbatim}
 - Rock allows us to index the key type by the return type of
@@ -530,8 +526,8 @@ rules key = case key of
 \end{verbatim}
 \cite{olle_query_based}
 
-\addcontentsline{toc}{subsection}{Caching \cite{olle_query_based}}
-\subsection*{Caching \cite{olle_query_based}}
+\addcontentsline{toc}{section}{Caching [Olle20]}
+\section*{Caching [Olle20]}
 
 \begin{verbatim}
 - The most basic way to run a Task in Rock is to directly
@@ -553,8 +549,8 @@ single run of the compiler.
 \end{verbatim}
 \cite{olle_query_based}
 
-\addcontentsline{toc}{subsection}{Verifying dependencies and reusing state \cite{olle_query_based}}
-\subsection*{Verifying dependencies and reusing state \cite{olle_query_based}}
+\addcontentsline{toc}{section}{Verifying dependencies and reusing state [Olle20]}
+\section*{Verifying dependencies and reusing state [Olle20]}
 
 \begin{verbatim}
 - Another kind of functionality that can be layered onto the
@@ -578,8 +574,8 @@ queries that depend on the parse result.
 \end{verbatim}
 \cite{olle_query_based}
 
-\addcontentsline{toc}{subsection}{Reverse dependency tracking \cite{olle_query_based}}
-\subsection*{Reverse dependency tracking \cite{olle_query_based}}
+\addcontentsline{toc}{section}{Reverse dependency tracking [Olle20]}
+\section*{Reverse dependency tracking [Olle20]}
 
 \begin{verbatim}
 - Verifying dependencies can be too slow for real-time
@@ -612,13 +608,13 @@ tooling!
 \end{verbatim}
 \cite{olle_query_based}
 
-\addcontentsline{toc}{section}{Caso de Estudio: Rustc}
-\section*{Caso de Estudio: Rustc}
+\addcontentsline{toc}{chapter}{Caso de Estudio: Rustc}
+\chapter*{Caso de Estudio: Rustc}
 
 Rustc, el compilador de rust, tiene su propia implementacion de queries.
 
-\addcontentsline{toc}{subsection}{Rustc Dependency graphs}
-\subsection*{Rustc Dependency graphs}
+\addcontentsline{toc}{section}{Rustc Dependency graphs [Woe16]}
+\section*{Rustc Dependency graphs [Woe16]}
 
 \begin{verbatim}
 - There is a formal method that can be used to model a
@@ -646,8 +642,8 @@ relied on anymore.
 \end{verbatim}
 \cite{rust_blog_incremental_compilation}
 
-\addcontentsline{toc}{subsection}{Dependency Tracking in the Compiler}
-\subsection*{Dependency Tracking in the Compiler}
+\addcontentsline{toc}{section}{Dependency Tracking in the Compiler [Woe16]}
+\section*{Dependency Tracking in the Compiler [Woe16]}
 
 \begin{verbatim}
 - When compiling in incremental mode, we always build the
@@ -740,10 +736,12 @@ agree on the same, yet wrong, value.
 \end{verbatim}
 \cite{rust_blog_incremental_compilation}
 
-\addcontentsline{toc}{subsection}{The Current Status of the Implementation}
-\subsection*{The Current Status of the Implementation** (09/2019)}
+\addcontentsline{toc}{section}{The Current Status of the Implementation [Woe16]}
+\section*{The Current Status of the Implementation [Woe16]}
 
 \begin{verbatim}
+(09/2019)
+
 - For the first spike implementation of incremental
 compilation, what we call the alpha version now, we chose to
 focus on caching object files.
@@ -771,13 +769,13 @@ strictly necessary.
 \end{verbatim}
 \cite{rust_blog_incremental_compilation}
 
-\addcontentsline{toc}{section}{Caso de Estudio: Rust-analyzer y Salsa}
-\section*{Caso de Estudio: Rust-analyzer y Salsa}
+\addcontentsline{toc}{chapter}{Caso de Estudio: Rust-analyzer y Salsa}
+\chapter*{Caso de Estudio: Rust-analyzer y Salsa}
 
 Rust-Analyzer utiliza una libreria llamada salsa.
 
-\addcontentsline{toc}{subsection}{Caso de Estudio: Como funciona salsa?}
-\subsection*{Caso de Estudio: Como funciona salsa?}
+\addcontentsline{toc}{section}{Como funciona salsa?}
+\section*{Como funciona salsa?}
 
 La idea central de salsa es definir el programa como un conjunto de \textit{queries}.
 Cada query se usa como una función $K \to V$ que mapea de una clave de tipo $K$ a un valor de tipo $V$.
@@ -801,8 +799,8 @@ Se puede definir mas de un grupo para separar las queries en componentes.
 \item Definir la base de datos, la cual contendra el almacenamiento para las entradas y queries utilizadas.
 \end{enumerate}
 
-\addcontentsline{toc}{subsection}{Conclusiones}
-\section*{Conclusiones}
+\addcontentsline{toc}{chapter}{Conclusiones}
+\chapter*{Conclusiones}
 
 \begin{verbatim}
 - Most modern languages need to have a strategy for tooling,
@@ -839,34 +837,30 @@ to be type checked in parallel.
 \end{verbatim}
 \cite{olle_query_based}
 
-\begin{verbatim}
-- **Future Plans** (09/2019)
-- The section on the current status already laid out the two
-  major axes along which we will pursue increased efficiency:
-  - Cache more intermediate results, like MIR and type
-    information, which will allow the compiler to skip more
-    and more steps.
-  - Make dependency tracking more precise, so that the
-    compiler encounters fewer false positives during cache
-    invalidation.
-\end{verbatim}
+Planes futuros para rustc (09/2019)
+
+Los dos ejes principales a lo largo de los cuales se buscara mejorar la eficiencia de rustc son:
+\begin{itemize}[noitemsep]
+\item Cachear mas resultados intermediosm como MIR e informacion de tipo, permitiendo que el compilador evite repetir mas y mas pasos.
+\item Mejorar la precision del seguimiento de dependencias, para que el compilador encuentre menos falsos positivos durante la invalidacion del cache.
+\end{itemize}
 \cite{rust_blog_incremental_compilation}
 
-\addcontentsline{toc}{section}{Source Notes}
-\section*{Source Notes}
+\addcontentsline{toc}{chapter}{Source Notes}
+\chapter*{Source Notes}
 
-\addcontentsline{toc}{subsection}{Anders Hejlsberg on Modern Compiler Construction}
-\subsection*{Anders Hejlsberg on Modern Compiler Construction}
+\addcontentsline{toc}{section}{Anders Hejlsberg on Modern Compiler Construction}
+\section*{Anders Hejlsberg on Modern Compiler Construction}
 
 \cite{hejlsberg_modern_compiler_construction}
 
-\addcontentsline{toc}{subsection}{Build Systems a la Carte}
-\subsection*{Build Systems a la Carte}
+\addcontentsline{toc}{section}{Build Systems a la Carte}
+\section*{Build Systems a la Carte}
 
 \cite{mokhov2018build}
 
-\addcontentsline{toc}{subsection}{A New Architecture for Building Software}
-\subsection*{2016 LLVM Developers’ Meeting: D. Dunbar “A New Architecture for Building Software”}
+\addcontentsline{toc}{section}{A New Architecture for Building Software}
+\section*{2016 LLVM Developers’ Meeting: D. Dunbar “A New Architecture for Building Software”}
 
 \cite{dunbar2016}
 
@@ -910,8 +904,8 @@ llbuild - a framework
 
 a new architecture for building software
 
-\addcontentsline{toc}{section}{Fuentes y Referencias}
-\section*{Fuentes y Referencias}
+\addcontentsline{toc}{section}{Fuentes}
+\section*{Fuentes}
 
 \begin{itemize}[noitemsep]
 
