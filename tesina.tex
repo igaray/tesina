@@ -1,3 +1,90 @@
++\item Dos requerimientos nuevos paralelos: minimizar tiempo de compilacion y proveer mas informacion de manera mas interactiva a las herramientas de edicion.
++\item Los editores y entornos de desarrollo modernos usan LSP (Language Server Protocol). Porque?
++\item Una implementacion de LSP require de componentes de compiladores (especialmente analisis).
++\item La arquitectura de pipeline no se adapta bien a estos requerimientos modernos de reducir tiempos de compilacion y de proveer informacion online durante edicion.
++\item La compilacion incremental puede ser lograda mediante una arquitectura basada en queries.
++\item La arquitectura basada en queries es implementada tomando inspiracion de build systems.
++\item Como funciona el sistema de queries de rustc?
+
++\item Sean incrementales, es decir, si se recompila el proyecto
++despues de producir modificaciones en el código fuente, solo se
++recompile lo que fue afectado por esas modificaciones.
++\item Provean funcionalidad para editores, e.g. saltar a definición,
++encontrar el tipo de una expresión en una ubicación dada, y mostrar
++errores al editar.
++\end{itemize}
+
++\begin{verbatim}
++- Empujamos el codigo fuente por un pipeline y corremos un conjunto
++  fijo de transformacion sucesivamente hasta que al final emitimos
++  codigo ensamblador o algun otro lenguaje destino.
++  En el camino frecuentemente necesitamos leer y actualizar algun
++  estado. Por ejemplo, podriamos actualizar la tabla de tipos
++- We push source text down a pipeline and run a fixed set of
++  transformations until we finally output assembly code or some other
++  target language. Along the way we often need to read and update some
++  state. For example, we might update a type table during type
++  checking so we can later look up the type of entities that the code
++  refers to.
++\end{verbatim}
+
++  - fixed input/output, we only have a limited set of places where were supposed read and write data from, if the compiler wanted to cache data on the side, we dont even have an agreed upon location to do that
++
++so from a certain perspective, this is basically an api contract, and its an api that hasnt changed in decades
++we last major advancement was this argument that lets the compiler send dependencies back to the build system
++
++## how software could be built
++
++what would happen if we were willing to break this api?
++
++things that could be done
++- ad hoc lookup tables:
++  if you think about the lifetime of the compiler throughout the build, there are many places where the compiler ends
+up computing some amount of information in every build that could be accelerated through a lookup table
++  and if we had a way to keep that lookup table around, that woul dmake the build faster
++  but today that would require us to serialize it out to disk and read it back in, and that would mitigate some of the speedup, so we dont do that
++- early exit via output signatures:
++  we could implement in the compiler the ability to take a signature of the llvm ir after it comes out of codegen, and if that code signature is the same as the last time that file was compiled, we can skip the backend, we know we are going to get the same object file out
++  this is a big win if you change a comment in a file that causes all the project to rebuild, but none of your object
+files are going to change.
++- dealing with redundant template instantiaions
++  we spend a fair amount of time throughout the build doing a lot of work for the same template instantiation
++  creating them, typechecking them, generating the code for them, and then finally passing them all off to the linker, for it to get rid of most of them
++
++for all these things whats need is the ability to evolve the api between the build systema and the compiler
++
++## what about a module cache?
++
++it caches something throughout the whole build.
++
++yes:
++- automatically builds modules when needed
++- shares results across the build
++- no build system changes needed
++
++nonexample because it involves significant implementation complexity
++- has posix file lockingg in order to manage coordination
++- has its own cache consistency management scheme, few debugging tools, it has to watch and understand when it needs to rebuild modules
++- has to have its own eviction mechanism (automatic pruning, tuning parameters)
++- opaque to the build system scheduler
++
++## ideal model for building software
+
+
+
++What's the status of this 2 years later?
++
++Funny you should ask! llbuild is alive and strong, and now powers the default build system used in Xcode 10. Getting the "new architecture" proposed here off the ground has continued to be difficult, mostly due to the challenge of refactoring the existing compilers, and that the payoffs only start to get realized once a large amount of work has been done. It is hard to unwind 40 years of CS-precedent for how compilers are built overnight, but I am still optimistic about
+the potential here!
++... and probably worth adding: since this was published llbuild's own Ninja implementation usually outperforms the actual Ninja on most real world situations we've seen (such as building LLVM/Clang on a variety of different hardware).
++
++\section*{Fuentes y Referencias}
+
+
+
+
+
+
 \documentclass[12pt, a4paper]{report}
 \usepackage[utf8]{inputenc}
 \usepackage{enumitem}
