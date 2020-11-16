@@ -1,6 +1,7 @@
 \documentclass[12pt, a4paper]{report}
 \usepackage[utf8]{inputenc}
 \usepackage{enumitem}
+\usepackage{algpseudocodex}
 \usepackage{graphicx}
 \graphicspath{ {./images/} }
 
@@ -103,7 +104,7 @@ Por ejemplo, se puede actualizar la tabla de tipos durante la fase de verificaci
 El Language Server Protocol (LSP) es una protocolo abierto basado en JSON-RPC para el uso entre editores de codigo fuente o entornos de desarrollo integrados (IDE) y servidores que proveen funcionalidades especificas a lenguajes de programacion.
 El objetivo del protocolo es permitir que se implemente y distribuya el soporte para un lenguaje de programacion independientemente de un editor o IDE determinado.
 Implementar funcionalidad tal como autocompletado, ir a definicion, o mostrar documentacion relacionada a una entidad para un lenguaje de programacion determinado, requieren de esfuerzos significantes.
-Tradicionalmente este trabajo se debia repetir para cada herramienta de desarrollo, dado que cada herramienta proveia un API diferente al implementar la misma funcionalidad.
+Tradicionalmente este trabajo se debia repetir para cada herramienta de desarrollo, dado que cada herramienta proveia un API diferente al impl
 Un Servidor de Lenguaje provee inteligencia especifica a un lenguaje y se comunica con herramientas de desarrollo mediante un protocolo que permite comunicacion entre procesos.
 La idea detras de LSP es estandarizar el protocolo con el cual se comunican los las herramientas de desarrollo y los servidores. De esta manera, un unico servidor de lenguaje puede ser reutilizado por multiples herramientas de desarrollo, las cuales a su vez pueden soportar multiples lenguajes, con esfuerzo minimo.
 \cite{language_server_protocol}
@@ -133,24 +134,8 @@ Proveer el mismo servicio a otra herramienta de edicion requiere de un esfuerzo 
 LSP permite desacoplar los servicios de lenguaje del editor de tal manera que los servicios se pueden contener en un servidor de lenguaje de proposito general.
 Cual editor puede acceder a soporte sofisticado para muchos lenguajes diferentes al hacer uso de los servidores de lenguaje existentes.
 Similarmente, un programador involucrado en el desarrollo de un lenguaje nuevo puede crear servicios para ese lenguaje y hacerlo inmediatamente disponible para editores existentes.
-Hacer uso de servidores de lenguaje a traves del LSP por lo tanto tambien reduce la carga
-
-\begin{verbatim}
-Making use of language
-servers via the Language Server Protocol thus also reduces
-the burden on vendors of editing tools, because vendors do
-not need to develop language services of their own for the
-languages the vendor intends to support, as long as the
-language servers have already been implemented.
-
-The Language
-Server Protocol also enables the distribution and
-development of servers contributed by an interested
-third-party, such as end users, without additional
-involvement by either the vendor of the compiler for the
-programming language in use or the vendor of the editor to
-which the language support is being added.
-\end{verbatim}
+Hacer uso de servidores de lenguaje a traves del LSP por lo tanto tambien reduce la carga sobre los desarrolladores de herramientas de edicion, dado que no necesitan desarrollar sus propios servicios de lenguaje para cada lenguaje que quieren soportar.
+El LSP tambien habilita la distribucion y desarrollo de servidores contribuidos por terceros, tales como usuarios finales, sin participacion ni por parte de los desarrolladores del compilador del lenguaje o por los desarrolladores de la herramienta de edicion para la cual se esta agregando soporte de lenguaje.
 \cite{language_server_protocol_wiki}
 
 LSP no se limita a lenguajes de programacion.
@@ -191,48 +176,54 @@ Normalmente esto no es un problema, dado que la optimización del código genera
 \addcontentsline{toc}{section}{Arquitectura Basada en Queries [Olle20]}
 \section*{Arquitectura Basada en Queries [Olle20]}
 
+\addcontentsline{toc}{subsection}{Pasar de pipelines a queries [Olle20]}
+\subsection*{Pasar de pipelines a queries [Olle20]}
+
+Que se necesita para obtener el tipo de un identificador calificado?
+En una arquitectura basada en pipelines, se buscaria el tipo en la tabla de simbolos.
+Con queries, hay que pensarlo de manera distinta.
+En lugar de depender de haber actualizado un fragmento de estado, se computa de cero.
+En una primera iteracion, se hace siempre completamente de cero.
+Primero se averigua de cual archivo viene el nombre, y luego se leen el contenido del archivo, se parsea, posiblemente se realize algo de resolucion de nombres para saber a que nombres se refiere el codigo dado lo que se importa, y por ultimo se busca la definicion cuyo nombre ha sido resuelto y se verifica su tipo, finalmente retornandolo.
+
+\textit{We first find out what file the name comes from, then read the contents of the file, parse it, perhaps we do name resolution to find out what the names in the code refer to given what is imported, and last we look up the name-resolved definition and type check it, returning its type.}
+
 \begin{verbatim}
-- Going from pipeline to queries
+fetchType :: QualifiedName -> IO Type
+fetchType (QualifiedName moduleName name) = do
+    fileName <- moduleFileName moduleName
+    sourceCode <- readFile fileName
+    parsedModule <- parseModule sourceCode
+    resolvedModule <- resolveNames parsedModule
+    let definition = lookup name resolvedModule
+    inferDefinitionType definition
+\end{verbatim}
 
-- What does it take to get the type of a qualified name?
+Refactoreando este esquema en funcionas mas chicas.
 
-- In a pipeline-based architecture we would just look it up
-in the type table.
+\begin{verbatim}
+fetchParsedModule :: ModuleName -> IO ParsedModule
+fetchParsedModule moduleName = do
+  fileName <- moduleFileName moduleName
+  sourceCode <- readFile fileName
+  parseModule moduleName
 
-- With queries, we have to think differently.
-
-- Instead of relying on having updated some piece of state,
-we do it as if it was done from scratch.
-
-- As a first iteration, we do it completely from scratch
-
-- We first find out what file the name comes from, which
-might be Data/List.vix for Data.List, then read the contents
-of the file, parse it, perhaps we do name resolution to find
-out what the names in the code refer to given what is
-imported, and last we look up the name-resolved definition
-and type check it, returning its type.
+fetchResolvedModule :: ModuleName -> IO ResolvedModule
+fetchResolvedModule moduleName = do
+  parsedModule <- fetchParsedModule moduleName
+  resolveNames parsedModule
 
 fetchType :: QualifiedName -> IO Type
 fetchType (QualifiedName moduleName name) = do
-fileName <- moduleFileName moduleName
-sourceCode <- readFile fileName
-parsedModule <- parseModule sourceCode
-resolvedModule <- resolveNames parsedModule
-let definition = lookup name resolvedModule
-inferDefinitionType definition
+  resolvedModule <- fetchResolvedModule moduleName
+  let definition = lookup name resolvedModule
+  inferDefinitionType definition
+\end{verbatim}
 
-- Let's first refactor the code into smaller functions:
-
-- Note that each of the functions do everything from scratch
-on their own, i.e. they're each doing a (longer and longer)
-prefix of the work you'd do in a pipeline.
-
-- I've found this to be a common pattern in my query-based
-compilers.
-
-- One way to make this efficient would be to add a
-memoisation layer around each function.
+Notemos que cada una de estas funciones hace todo de cero, i.e. cada una realiza un prefijo cada vez mas largo del trabajo total que se haria en un pipeline.
+Esto ha resultado ser un patron comun en compiladores basados en queries.
+Una forma de mejorar la eficiencia de este esquema es agregar una capa de memoizacion alrededor de cada funcion.
+De esta manera, se ejecuta trabajo
 
 - That way, we do some expensive work the first time we
 invoke a function with a specific argument, but subsequent
@@ -241,7 +232,6 @@ calls are cheap as they can return the cached result.
 - This is essentially what we'll do, but we won't use a
 separate cache per function, but instead have a central
 cache, indexed by the query.
-\end{verbatim}
 \cite{olle_query_based}
 
 \addcontentsline{toc}{section}{Why Incremental Compilation in the First Place? [Woe16]}
