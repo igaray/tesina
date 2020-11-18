@@ -1,5 +1,10 @@
 *.gz
 *.aux
+*.bcf
+*.blg
+*.dvi
 *.log
 *.out
 *.toc
+*.xml
+_minted-tesina/*
