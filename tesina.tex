@@ -336,87 +336,47 @@ E.g. puede haber una query para obtener el modulo donde esta definido un tipo, y
 % \end{minted}
 % \cite{olle_query_based}
 
-\addcontentsline{toc}{section}{Caching [Olle20]}
-\section*{Caching [Olle20]}
-
-
-\begin{verbatim}
-- The most basic way to run a Task in Rock is to directly
-call the rules function when a Task fetches a key.
-
-- This results in an inefficient build system that
-recomputes every query from scratch.
-
-- But the Rock library lets us layer more functionality onto
-our rules function, and one thing that we can add is
-memoisation.
-
-- If we do that Rock caches the result of each fetched key
-by storing the key-value pairs of already performed fetches
-in a dependent hashmap.
-
-- This way, we perform each query at most once during a
-single run of the compiler.
-\end{verbatim}
-\cite{olle_query_based}
+% \addcontentsline{toc}{section}{Caching [Olle20]}
+% \section*{Caching [Olle20]}
+%
+% \begin{verbatim}
+% - The most basic way to run a Task in Rock is to directly
+% call the rules function when a Task fetches a key.
+%
+% - This results in an inefficient build system that
+% recomputes every query from scratch.
+%
+% - But the Rock library lets us layer more functionality onto
+% our rules function, and one thing that we can add is
+% memoisation.
+%
+% - If we do that Rock caches the result of each fetched key
+% by storing the key-value pairs of already performed fetches
+% in a dependent hashmap.
+%
+% - This way, we perform each query at most once during a
+% single run of the compiler.
+% \end{verbatim}
+% \cite{olle_query_based}
 
 \addcontentsline{toc}{section}{Verifying dependencies and reusing state [Olle20]}
 \section*{Verifying dependencies and reusing state [Olle20]}
 
-\begin{verbatim}
-- Another kind of functionality that can be layered onto the
-rules function is incremental updates. When it's used, Rock
-keeps track of what dependencies a task used when it was
-executed (much like Shake) in a table, i.e. what keys it
-fetched and what the values were.
-
-- Using this information it's able to determine when it's
-safe to reuse the cache from a previous run of the compiler
-even though there might be changes in other parts of the
-dependency graph.
-
-- This fine-grained dependency tracking also allows reusing
-the cache when a dependency of a task changes in a way that
-has no effect.
-
-- For example, whitespace changes might trigger a re-parse,
-but since the AST is the same, the cache can be reused in
-queries that depend on the parse result.
-\end{verbatim}
+Una funcionalidad que se puede incorporar a las funciones regla son las actualizaciones incrementales.
+Cuando se utiliza, el sistema de construccion mantiene un registro en una tabla de cuales dependencias uso una tarea al ejecutarse, i.e. cuales claves busco y cuales fueron sus valores asociados.
+Usando esta informacion es posible determinar cuando es seguro reutilizar el cache de una corrida previa del compilador aunque haya habido cambios en otras partes del grafo de dependencias.
+Este seguimiento de grano fino de las dependencias tambien permite reutilizar el cache cuando la dependencia de una tarea cambia de tal manera que el cambio no tiene efecto.
+E.g. cambios en el espaciado pueden disparar un reparseo, pero dado que el AST permanece igual, los valores del AST cacheados pueden ser reutilizados en queries que dependan de ese resultado de parseo.
 \cite{olle_query_based}
 
 \addcontentsline{toc}{section}{Reverse dependency tracking [Olle20]}
 \section*{Reverse dependency tracking [Olle20]}
 
-\begin{verbatim}
-- Verifying dependencies can be too slow for real-time
-tooling like language servers, because large parts of the
-dependency graph have to be traversed just to check that
-most of it is unchanged even for tiny changes.
-
-- For example, if we make changes to a source file with many
-large imports, we need to walk the dependency trees of all
-of the imports just to update the editor state for that
-single file.
-
-- This is because dependency verification by itself needs to
-go all the way to the root queries for all the dependencies
-of a given query, which can often be a large proportion of
-the whole dependency tree.
-
-- To fix this, Rock can also be made to track reverse
-dependencies between queries.
-
-- When e.g. a language server detects that a single file has
-changed, the reverse dependency tree is used to invalidate
-the cache just for the queries that depend on that file by
-walking the reverse dependencies starting from the changed
-file.
-
-- Since the imported modules don't depend on that file, they
-don't need to be re-checked, resulting in much snappier
-tooling!
-\end{verbatim}
+Verificar las dependencias puede ser demasiado lento para herramientas que deben proveer informacion en tiempo real como servidores de lenguaje, dado que puede ser necesario recorrer partes grandes del grafo de dependencias solo para verificar que no cambio nada aun para pequeños cambios.
+E.g. si se realizan cambios en un archivo fuente con una gran cantidad de imports, se debe caminar los grafos de dependencias de todos los imports para actualizar el estado del editor para ese unico archivo.
+Para evitar esto, se puede registrar las dependencias inversas entre queries.
+E.g. cuando un servidor de lenguaje detecta que un unico archivo ha cambiado, el grafo de dependencia inverso se usa para invalidar el cache unicamente para las queries que dependen de ese archivo, recorriendo las dependencias inversas comenzando desde el archivo modificado.
+Dado que los modulos importados no dependen de ese archivo, no deben ser verificados nuevamente, resultando en una respuesta mucho mas pronta del servidor de lenguaje.
 \cite{olle_query_based}
 
 \addcontentsline{toc}{chapter}{Caso de Estudio: Rustc}
@@ -430,130 +390,52 @@ Rustc, el compilador de rust, tiene su propia implementacion de queries.
 Existe un modelo formal que puede usarse para modelar los resultados intermedios de una computacion y su propiedad de estar actualizad de una manera directa: los grafos de dependencias.
 Cada entrada y cada resultado intermedio son representados como un nodo en un grafo dirigido.
 Los arcos en el grafo representan cual resultado intermedio o entrada puede tener influencia en otro resultado intermedio.
-En general los arboles
-
-\begin{verbatim}
-- There is a formal method that can be used to model a
-computation's intermediate results and their individual
-"up-to-dateness" in a straightforward way: dependency
-graphs.
-
-- It looks like this: Each input and each intermediate
-result is represented as a node in a directed graph. The
-edges in the graph, on the other hand, represent which
-intermediate result or input can have an influence on some
-other intermediate result.
-
-- Note, by the way, that the above graph is a tree just
-because the computation it models has the form of a tree. In
-general, dependency graphs are directed acyclic graphs
-
-- What makes this data structure really useful is that we
-can ask it questions of the form "if X has changed, is Y
-still up-to-date?". We just take the node representing Y and
-collect all the inputs Y depends on by transitively
-following all edges originating from Y. If any of those
-inputs has changed, the value we have cached for Y cannot be
-relied on anymore.
-\end{verbatim}
+En general no se puede asumir que los grafos de dependencias son arboles, sino grafos dirigidos aciclicos.
+Lo que convierte a esta estructura de datos en realmente util es que permite realizar consultas tales como "si X ha cambiado, entonces Y aun esta actualizado?".
+Para resolver esta consulta se examina un nodo Y y se colectan las entradas de las cuales Y depende transitivamente, siguiendo los arcos salientes de Y.
+Si alguna de esas entradas cambio, el valor cacheado para Y esta desactualizado y debe ser recomputado.
 \cite{rust_blog_incremental_compilation}
 
 \addcontentsline{toc}{section}{Dependency Tracking in the Compiler [Woe16]}
 \section*{Dependency Tracking in the Compiler [Woe16]}
 
+Al compilar en modo incremental, siempre se construye el grafo de dependencia de los datos producidos: cada vez que se escribe un dato (como un archivo objeto), se registra cuales otros datoa se acceden en el proceso.
+Se hace enfasis en el registro. En todo momento el compilador mantiene el registro de sobre cual dato esta trabajando (esto lo hace en background en memoria local al thread).
+Este es el nodo actualmente activo del grafo de dependencias.
+Por otro lado, el dato que necesita ser leido para computar el valor del nodo actual tambien se registra: usualmente ya reside en algun tipo de contenedor (e.g. una tabla hash) que requiere invocar un metodo de lookup para acceder a una entrada especifica.
+Se hace uso de este hecho, haciendo que los metodos de lookup crean los arcos del grafo de dependencia, y sencillamente se agregan al grafo.
+Al final de las sesiones de compilacion se tienen todos los nodos enlazados, automaticamente.
+\cite{rust_blog_incremental_compilation}
+
 \noindent
 \includegraphics[width=0.9\textwidth]{woe16_compiler_dep_graph}
+
+Este grafo de dependencia se almacena en un directorio de cache de compilacion incremental, junto con las entradas que el cache describe.
+Al comienzo de una sesion de compilacion siguiente, se detecta cuales entradas (i.e. nodos del AST) han cambiado, comparandolas con sus versiones previas.
+Dado el grafo y el conjunto de entradas que cambiaron, se puede facilmente encontrar todas las entradas en el cache que no estan actualizadas y eliminarlas del cache.
+Cualquier elemento que sobrevivio esta fase de validacion de cache puede ser re-utilizado durante la sesion de compilacion actual.
+\cite{rust_blog_incremental_compilation}
 
 \noindent
 \includegraphics[width=0.9\textwidth]{woe16_compiler_cache_purge}
 
-\begin{verbatim}
-- When compiling in incremental mode, we always build the
-dependency graph of the produced data: every time, some
-piece of data is written (like an object file), we record
-which other pieces of data we are accessing while doing so.
-
-- The emphasis is on recording here. At any point in time
-the compiler keeps track of which piece of data it is
-currently working on (it does so in the background in
-thread-local memory).
-
-- This is the currently active node of the dependency graph.
-Conversely, the data that needs to be read to compute the
-value of the active node is also tracked: it usually already
-resides in some kind container (e.g. a hash table) that
-requires invoking a lookup method to access a specific
-entry.
-
-- We make good use of this fact by making these lookup
-methods transparently create edges in the dependency graph:
-whenever an entry is accessed, we know that it is being read
-and we know what it is being read for (the currently active
-node).
-
-- This gives us both ends of the dependency edge and we can
-simply add it to the graph. At the end of the compilation
-sessions we have all our data nicely linked up, mostly
-automatically.
-
-- This dependency graph is then stored in the incremental
-compilation cache directory along with the cache entries it
-describes.
-
-- At the beginning of a subsequent compilation session, we
-detect which inputs (=AST nodes) have changed by comparing
-them to the previous version. Given the graph and the set of
-changed inputs, we can easily find all cache entries that
-are not up-to-date anymore and just remove them from the
-cache.
-
-- Anything that has survived this cache validation phase can
-safely be re-used during the current compilation session.
-
-- There are a few benefits to the automated dependency
-tracking approach we are employing. Since it is built into
-the compiler's internal APIs, it will stay up-to-date with
-changes to the compiler, and it is hard to accidentally
-forget about. And if one still forgets using it correctly
-(e.g. by not declaring the correct active node in some
-place) then the result is an overly conservative, but still
-"correct" dependency graph: It will negatively impact the
-re-use ratio but it will not lead to incorrectly re-using
-some outdated piece of data.
-
-- Another aspect is that the system does not try to predict
-or compute what the dependency graph is going to look like,
-it just keeps track. A large part of our (yet to be written)
-regression tests, on the other hand, will give a description
-of what the dependency graph for a given program ought to
-look like. This makes sure that the actual graph and the
-reference graph are arrived at via different methods,
-reducing the risk that both the compiler and the test case
-agree on the same, yet wrong, value.
-\end{verbatim}
+Existen algunos beneficios al esquema de seguimiento de dependencias automatico que se esta empleando.
+Dado que esta incorporado a las interfaces internas del compilador, es dificil olvidarse accidentalmente de el.
+Si aun asi un desarrollador se olvida (e.g. no declarando el nodo activo) entonces el resultado es demasiado conservador, pero el grafo de dependencia aun sera correcto, impactara negativamente en la cantidad de reutilizacion pero no llevara a usar incorrectamente un dato desactualizado.
 \cite{rust_blog_incremental_compilation}
 
-\begin{verbatim}
-- Let's take a look at some of the implications of what
-  we've learned so far:
-  - The dependency graph reflects the actual dependencies
-    between parts of the source code and parts of the output
-    binary.
-  - If there is some input node that is reachable from many
-    intermediate results, e.g. a central data type that is
-    used in almost every function, then changing the
-    definition of that data type will mean that everything
-    has to be compiled from scratch, there's no way around
-    it.
-- In other words, the effectiveness of incremental
-  compilation is very sensitive to the structure of the
-  program being compiled and the change being made.
-  Changing a single character in the source code might very
-  well invalidate the whole incremental compilation cache.
-  Usually though, this kind of change is a rare case and
-  most of the time only a small portion of the program has
-  to be recompiled.
-\end{verbatim}
+Tambien es de notar que el sistema no intenta predecir o computar como sera el grafo de dependencia.
+Una gran parte de las pruebas de regresion, sin embargo, si tendran una descripcion de como deberia ser el grafo de dependencia para un programa dado.
+Esto asegura que el grafo efectivo y el grafo de referencia se construyen por distintos metodos, reduciendo el riesgo de que tanto el compilador y el test esten de acuerdo en un valor incorrecto.
+\cite{rust_blog_incremental_compilation}
+
+Algunas implicaciones:
+El grafo de dependencia refleja las dependencias efectivas entre partes del codigo fuente y partes del binario emitido.
+Si existe un nodo de entrada que es alcanzable de muchos nodos intermedios, e.g. un tipo de dato central que es utilizado en casi toda funcion, entonces cambiar la definicion de ese tipo de dato causara que casi todo debe ser compilado de cero.
+
+En otras palabras, la efectividad de la compilacion incremental es muy sensible a la estructura del programa siendo recompilado y al cambio realizado.
+Cambiar un unico caracter del codigo fuente podria invalidar completamente el cache de compilacion incremental.
+Sin embargo, este tipo de cambio es un caso raro y la mayor parte del tiempo solo una pequeña porcion del programa debe ser recompilado.
 \cite{rust_blog_incremental_compilation}
 
 \addcontentsline{toc}{section}{The Current Status of the Implementation [Woe16]}
