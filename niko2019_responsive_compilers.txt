@@ -1,0 +1,472 @@
+\addcontentsline{toc}{section}{Responsive Compilers}
+\section*{Responsive compilers - Nicholas Matsakis - PLISS 2019}
+\cite{niko2019responsive}
+
+\begin{Verbatim}[fontsize=\small]
+
+# pipelines and passes
+
+when I started writing compilers, we used the dragon book I
+learned this classic structure of how to write a compiler
+which was all about passes
+
+that is precisely how rustc used to look
+
+the reason that there has been a change is that the way you
+interact with comilers has changed
+
+the way the rust compiler was written and the way compilers
+usually work is this batch compilation model
+
+where you run it, process the whole source and you produce
+an output and maybe get an error out of it
+
+these days people are working with ides and you want a
+different way to interact with the source when your in this
+model
+
+you want to take messed up inputs, make sense of them, you
+want to be able to do compiletions and jump to definitions
+in an interactive way
+
+my goal today:
+what if the dragon book were written today
+
+i think there are more questions marks than answer, we dont
+have all the things written down to make the book
+
+but I have a lot of experiences of what we tried and the
+challenves
+
+the first thing to learn about this environment today is
+that there has been a big shift the last couple of years in
+how ides are written is that microsoft introduced vs code,
+which is an amazing editor, but among the many amazing
+things it introduced is the LSP, which is an intermediate
+protocol for interfacing between the language that's being
+compiled and the editor that's interacting, wo that neither
+have to be tied to each other
+
+it used to be that when you wrote an eclipse plugin for your
+language it just worked in exclsipse, and then if you wanted
+to 4extend for netbeans, and emacs, and vim, etc
+
+but LSP lets you sidestep that
+
+so for example in the rust compiler we have a language
+service, we actually ahve to and they work for emacws, vi,
+whatever
+
+# The "responsive" compiler
+
+- compiler as an actor
+- editor sends diffs and requests completions, diagnostics
+- compiler responds
+
+what you wind up in this model is that instead of having the
+compiler be something that you run in the command line it's
+more of an actor, the editor is sending you diffs of the
+files youre compoiling, and you are responding to them and
+sending back diagnostics,
+
+and it might say, ok, we want to know what are the
+completions at this point, and your compiler responds with a
+vector of responses
+
+key point: need to be able to respond as quickly as possible
+
+so you wind up with a pretty different structure
+
+andd you ahve to think about what is the minimum information
+you need to answer that requests, and can you process just
+that so you can get responses as fast as possible
+
+so instead of a type checker that walks all the sources and
+does all the things for all the functions, ok i just need to
+type  check this statement, how much context do i need to do
+that
+
+and i go back out to the function, i have to go back out to
+other functions sometimes, but not all of them, find their
+signatures, etc
+
+# demand driven
+
+so what weve been trying to do is move to a more demand
+driven architecture
+
+- start from goal
+- figure out what is needed for that
+
+you have a given goal you need to do, and that goal is
+implemented by some function that uses other functions, and
+you go backwards, but you try to keep this set to a minimum
+
+at the end of the day you still have thesed traditional
+compiler passes, logical, but you might not be executing
+them completely and you might now tbe executing them in
+order
+
+# why should you care about IDEs?
+
+there are some things ive noticed in trying to make this
+transformation that surprised me
+
+and there some reasons to try to do an ide friendly
+approach, even if its not a full ide, from the beginning
+
+- you have to write code in this language your making
+- it really informs your language design,
+  you becoime much more aware of what depoendencies you need
+  to figure out bits of information and that might lead you
+  to make or not make certain desicions
+- stric phase separation is impossible anyway
+
+# dependencies matter
+
+rust allows arbitrryu nesting of delcarations inside
+fuinctions an example of something we would not have done
+had we implemented ides earlier on
+
+rust has always allowed you to nest things rather
+arbitrarily for example a function with a struct inside of
+it
+
+thats kinda handy, sometimes you want some local data that's
+not needed outside the function
+
+fn foo() {
+  // Equivalent to a struct declared at the root of the
+  // file, but only visible inside this function.
+  struct Bar{}
+  let x = Bar{};
+}
+
+you can also put methods on the struct
+
+fn foo() {
+  struct Bar{}
+  impl Bar {
+    pub fn method() { ... }
+  }
+  let x = Bar{};
+}
+
+a side effect of this is that auto-completion requires
+looking inside a lof of function bodies
+
+what tha means is that I could have a struct visible from
+outside the function, and put methods on it inside the
+function, and I can call those methods from outside the
+function, because the methods are dispatched based on the
+type, and we attached the method to type Bar, and if I have
+an instance of Bar from outsidfe the function I can call and
+what that means is that I'm doing completion on a value of
+type Bar, I really need to parse the inside of my function
+bodies to figure out if there is an impl that muight be
+releant, or else I wont get those methods
+
+struct Bar {}
+fn some_method() {
+  let bar = Bar::new();
+  bar. // <-- what methods should we offer as
+       // auto-completion here?
+}
+
+# strict phase separation is impossible anyway
+
+the other reason that led us in this direction, is that in
+most compiler that I've worked on , if you have a strict
+phase spearation in which you fully resolve all the symbols,
+then type check all the bodies, and then... it e3nds up kind
+of constraining, and you often need to process your source
+in a difficult order
+
+in many languages its a constraint you dont want
+
+Rust, for example, lets you do this:
+
+const LEN: u8 = 1 + 1 + 1;
+const DATA: [u8; LEN] = [1, 1, 1]:
+
+what this means now is that there is an interdependency, in
+order to know the full type of DATA, I have to evaluate the
+constant LEN, and in order to evaluate the constant LEN, I
+have to type check its body and execute in some way,
+interpret it, symbolically execute it, to figure out what
+it's value is, and that means I can't fully type check all
+the constants in one order, without considering the
+dependencies between them before I can even figure out the
+type of data.
+
+What we used to do is some horrible hack.
+
+We essentially had two implementations of some parts of the
+compiler, because we needed to have some subset of the
+typechecker and evaluator that was good enough to evaluate
+things like LEN and that could execute at any part on
+demand, and then we had the real code that did the full
+check that came after.
+
+It was a horrible pain.
+
+And now in this more demand based system this isnt a problem
+because we can go and execute LEN on its own.
+
+What if we were to do this?
+
+const LEN: u8 = DATA[0] + DATA[1] + DATA[2];
+const DATA: [u8; LEN] = [1,1,1];
+
+Usually when you're doing this sort of thing you end up
+needed to detect cycles and this kind of falls out out of
+the framework we're working on basically.
+
+Other examples of phase separation:
+- inferred types across function boundaries in e.g ML
+- in rust, theres a bunch of things in the logic language:
+  specialization, which requires solving some traits
+- java and its lazy class file loading, how many different
+  things the dot operator does in java, you will find that
+  there is a bunch of lazyness, the set of classes a given
+  classs can touch is determined as you walk the file you
+  compile
+- how racket deals with phase separation and scheme macros
+
+in a lot of languages you find you want to evaluate some
+subset of the source and type check and be able to woirk
+with thme without necesarily processin ght whoel thing
+
+# Not a solved problem
+
+what have we been actually doing to solve this
+
+- hand coded
+- salsa
+- more formal technique
+  - attribute grammars
+  - datalog or structured queries
+
+rustc takes an approach based on a framework called salsa
+it enables you to still write your compiler in a general
+purpose programming language what feels familiar
+
+there are two different alternative to this,
+
+one of them, the hand coded version, ive seen more in
+practice in other places, is not having a framework but
+thinking very carefully about things, doing the same things
+but open coded, doing things by hand figuring out if im
+going to type check this, i need to figure out these
+dependencies, and making it work
+
+that is of course very practical, it just can have bugs,
+incremental inconsistencies, etc if you have forgotten about
+a dependency between things
+
+another way is more formal, higher level expression
+
+then you have to make sure that everything you do fits in to
+this framework or extend the framework
+
+so salsa is kind of a middle ground
+
+# Salsa
+- high level idea:
+  - inputs
+  - derived queries
+
+- most closely related work:
+  - adapton
+  - glimmer from the ember web framework
+  - build systems a la carte
+
+the high level idea of this framework is that you separate
+out the inputs to your compilation and then a bunch of
+derived stuff.
+
+the derived queries are basically pure functions that get to
+demand other results/queries, that they needs, some of which
+may be inputs and when we use one of these functions we
+track what bits of data did it use and ultimately which
+inputs did it use, and then whene theres a cahnge to one of
+these inputs we can propagate the change and try to avoid re
+executing some of these things.
+
+there are a lot of systems in this space
+
+the three that I know of are these
+
+two of these are academic, adapton approach by mathew hammer
+and BSALC a paper by simon peyton jones that built a very
+flexible system in haskell that has a similar basis
+
+teh difference would be that ours is in between BSALC allows
+you to customize a lot of different thing and tweak many
+things, adapton is also a little more flexible but also more
+complicated
+
+an interesting approach is glimmer engine in the ember web
+framework, which does incremental updates. i havent looked
+deeply at what react or elm does but i imagine they are
+kinda related
+
+turns out this is a problem that applies to many areas, not
+just compilation
+
+# Salsa core idea
+\end{Verbatim}
+
+\begin{minted}{rust}
+let mut db = Database::new();
+loop {
+  db.set_input_1( ... );
+  db.set_input_2( ... );
+
+  db.derived_value_1();
+  db.derived_value_2();
+}
+\end{minted}
+
+\begin{Verbatim}
+when you are writing a program in salsa it kinda looks like
+this and then you essentialy have a loop where you set some
+inputs, and that's like when you get a diff from the editor,
+and you compute some derived values
+
+and the idea is that these things are memoized, so whenever
+you ask for a derived value it will always be up to date,
+for whatever the input changes you have made
+
+# Entity component System
+
+- entity: unit of entity
+- component: data about an entity
+\end{Verbatim}
+
+\begin{minted}{rust}
+fn move_left(entity: Entity, amount: usize) {
+  let pos = DB.position(entity);
+  pos.x -= amount;
+  DB.set_position(entity, pos);
+}
+\end{minted}
+
+\begin{Verbatim}
+when you really try to write a whole compiler withj this
+kind of model one of the things that arises is this
+relationship to ECS, this is kind of a right turn but I want
+to explain this as a sort of background as a way to think
+about how this feels in practice
+
+an ECS is something that arises from game proigramming and
+is an alternative to OOP
+
+where you separate out data and the identity
+
+so in an OOP you have a class and you make an instance of it
+and all of iots dasta and its operation are defined at that
+moment when you created it
+
+whereas in an ECS you create a new entitty aND it has
+nothing associated with thi but identity, and then you can
+have separately data that you attache to it
+
+in games this is useful because of the very dynamic nature
+of data in a game.
+
+it allows you to be unstructured and in a compilar that part
+is not as importnat but its pretty useful
+
+# Entities in a compiler
+
+- often called symbols
+- things like
+  - input files
+  - struct declarations
+  - fields
+  - function declarattions
+  - parameters or local variables
+- something "addressable" by other parts of the system
+
+so what you wind iup with is a system where you entities
+correspond to things that get declared in the program
+language and you layer on different bits of data about this
+symbols so you might have a type, etc
+
+and ther reason you layer this on is this is what allows us
+to be so demand driven
+
+we can ask about the type of a symbol and get that without
+getting all the other bits of data that might eventually
+come to be associated with it
+
+# Components in a compiler
+
+things like
+- the type of an entity
+- the signature of a function
+
+there are a couple different things that are like
+components, type is one, signature is another, sometimes
+there are more like unit results, or lists of errors, the
+result of applying some analysis that can reject
+
+# Salsa queries
+
+Q(K0 .. Kn) -> V
+- Q is the query name (like AST)
+- the K0 .. Kn are the query keys
+  - atomic values of any type
+- The V is the value associated with the query
+
+the basis structure of this salsa  systems is that you have
+queries, which have a name
+its not quite an ECS in that we dont have a formal concept
+of entities instead what we have is queries which are kind
+of like components
+a query name might be like the type or the signature
+and then we have a set of keys that go into the query
+and often there is only one
+
+# Example queries
+# Query group
+# Input queries
+# Derived Queries
+# How salsa works
+# Recomputation (simplified)
+# But suppose input change is not important
+# Recomputation (less simplified)
+# Order matters
+# Minimizing redundant checks
+# Garbage collection
+# General idea
+# Layering
+# Represent layers with maps
+# Rust compiler of yore
+# Trees are your friends
+# Interning
+# Tree-based entities also give context
+# Signature
+# Tightening queries with projection
+# The "outer spine"
+# Error handling
+# Recovery from day one
+# Example: error type
+# Diminishing returns
+# Handling cycles
+# Example: inlining (take 1)
+# Example: inlining (take 2)
+# Non-deterministic results
+# One better approach
+# Other cases involving cycles
+# Tracking location information ("spans")
+# What to put in your AST
+# Incremental re-parsing
+# Example: swift red and black trees
+# Alternative: "zooming out" or "zooming in"
+# Threading
+# Salsa's threading model
+# Cancellation
+# Conclusion
+\end{Verbatim}

@@ -1,0 +1,298 @@
+\addcontentsline{toc}{section}{A New Architecture for Building Software}
+\section*{2016 LLVM Developers’ Meeting: D. Dunbar “A New Architecture for Building Software”}
+
+\cite{dunbar2016}
+
+\begin{Verbatim}[fontsize=\small]
+
+## Overview
+
+compile times impact developers
+clang was designed from the beginngin to be a very fast c/c++
+that was one of the motivations
+
+the strategy was
+- to have a tuned lex and parse implementation
+- focused heavily on having a low overhead -O0 path, no unnecesary
+  optimizations on -O0, and do things such as fast instruction
+  selection, etc
+- redesigned pch (pre compiled headers), try to pull the minimal
+  amount of data from headers
+- integrated the assembler into the compiler, to avoid the time of
+  emitting assembly code and loading it back into the assembler
+
+this proved succesful, clang was 3x faster than gcc
+but over time this lead has diminished
+in part because gcc itself got faster but mainly because
+
+performance regresses over time because features are added, and
+tuning can break
+
+improving compile time, options:
+- distributed compilation
+- improved caching, ideally distributed and shared
+- do less work
+
+there are things that in the case of clang could be done today,
+such as reuse the frontend for compiling several files sharing the
+same compile flags, allowing the frontend to better chache
+e.g. file stat calls and other metadata, or build pch for hotly
+edited files.
+
+while this works, the problem is that there is no control in the
+compiler over how it is invoked, as this depends on the build system
+one proposal is to build a compiler-service, but this presents other
+problems
+
+## How we build software today
+
+for most languages, traditional unix/build system model
+- compiler runs as a separate process
+- primitive mechanisms for communicating dependencies between build
+  systems and the compiler
+  - the build system tells us about our inputs andoutpus through
+    command line arguemtns
+  - mechanism by which the compiler can write out additional
+    dependencies the build system can ingest, we dont even have a
+    real file format we use for that, we just write out a makefile
+    format and force the build system to ingest it
+  - fixed input/output, we only have a limited set of places where
+    were supposed read and write data from, if the compiler wanted
+    to cache data on the side, we dont even have an agreed upon
+    location to do that
+
+so from a certain perspective, this is basically an api contract,
+and its an api that hasnt changed in decades
+we last major advancement was this argument that lets the compiler
+send dependencies back to the build system
+
+## how software could be built
+
+what would happen if we were willing to break this api?
+
+things that could be done
+- ad hoc lookup tables:
+  if you think about the lifetime of the compiler throughout the
+  build, there are many places where the compiler ends up computing
+  some amount of information in every build that could be
+  accelerated through a lookup table
+  and if we had a way to keep that lookup table around, that would
+  make the build faster
+  but today that would require us to serialize it out to disk and
+  read it back in, and that would mitigate some of the speedup, so
+  we dont do that
+- early exit via output signatures:
+  we could implement in the compiler the ability to take a signature
+  of the llvm ir after it comes out of codegen, and if that code
+  signature is the same as the last time that file was compiled,
+  we can skip the backend, we know we are going to get the same
+  object file out
+  this is a big win if you change a comment in a file that causes
+  all the project to rebuild, but none of your object files are
+  going to change.
+- dealing with redundant template instantiaions
+  we spend a fair amount of time throughout the build doing a lot of
+  work for the same template instantiation
+  creating them, typechecking them, generating the code for them,
+  and then finally passing them all off to the linker, for it to get
+  rid of most of them
+
+for all these things whats need is the ability to evolve the api
+between the build systema and the compiler
+
+## what about a module cache?
+
+it caches something throughout the whole build.
+
+yes:
+- automatically builds modules when needed
+- shares results across the build
+- no build system changes needed
+
+nonexample because it involves significant implementation complexity
+- has posix file lockingg in order to manage coordination
+- has its own cache consistency management scheme, few debugging
+  tools, it has to watch and understand when it needs to rebuild
+  modules
+- has to have its own eviction mechanism (automatic pruning, tuning
+  parameters)
+- opaque to the build system scheduler, if one starts a bunch of build
+  jobs and they all want the same model, from the build systems
+  perspective, it going to be blocked, waiting for all of those, but
+  it actually could be doing more work on the core that it has, it
+  just doesnt know that.
+
+## ideal model for building software
+
+- what we really want is some kind of flexible api between the c
+  ompiler and the build system
+
+goals:
+- it should be really easy to share redundant work, if we see a place
+  in the compiler where we realize its redundant throughout the
+  lifetime of the build, we should be able to implement that quickly
+- optimize the compiler for the entire build: most users, other than
+  compiler engineers, dont care about objetct files, what they care
+  about is getting their final product out
+  thats the situation we should optimize the compiler at, being fast
+  for doing the entire build
+- conversely, we should be able to optimize the build system via a
+  rich compiler api
+  if theres a place where the compiler realizes it could do some
+  amount of work in parallel, it would be relly nice if we could talk
+  back to the build system and communicate with it so that the job can
+  be scheduled effectively
+- consistent incremental builds and debuggable architecture: one of
+  the benefitrs of the curent strategy is that we try very hard on the
+  compiler to make this strong guarantee that the same input will
+  produce the exact same object file output, that 's a very good basis
+  for having reliable reproducible builds.
+
+- need ability yo integrate the build system and the compiler
+
+requires:
+- library based compiler: a compiler that has been architected to be
+  able to be used that way
+- extensible build system, a build system that has been designed with
+  the idea in mind that some of the tools that it interacts with
+  should be able to plug in more deeply than just as an extensible
+  process.
+  when you call make or ninja, they expect to call you via subprocess
+  and theres a few ways you can interact with them but not a lot
+- compiler plugin for that
+
+## introducing llbuild
+
+goals:
+- ignore build description / input language
+  not make a new syntax as a replacement for cmake
+  most build systems, somewhere inside they have a little engine
+  that is capable of evaluating a dependency graph
+  that engine is usually fairly simple
+- with llbuild focus on building a powerful engine
+  - support work being discovered on the fly
+    very few build can support the situation where your executing
+    some task and during the execution of that task you realize you
+    need to do more work
+  - scale to millions of tasks
+    because the goal was to take our existing build and partition
+    them into much smaller pieces to be able to get better
+    incremental beehaviour it really needed to be able to scale
+  - support sophisticated scheduling
+    during a build of llvm we have a lot of cpu boudn stuff running
+    the compipler, and we have a lot of io bound stuff, like runner
+    the linker , which sucks in all the object files
+  - powerful debugging tools
+- support a pluggable task api
+
+### llbuild architecture
+
+- flexible underlying core engine
+  the llvm ir equivalent, a common denominator between the high level
+  things, build systems, and the lower level optimization
+  - library for persistent, incremental computation
+  - heavily inspired by a haskell build system called shake
+  - low-level
+    - inputs and outputs are byte strings
+      there are no files, just strings of bytes, and the expectation
+      that as a client, you'll encode data in those if necessary
+    - functions are abstract
+    - use c++ api between tasks
+  - on top of this core: hiher-level build systems are built on the
+    core there's a ninja implementation on top of this, a package
+    manager
+
+### llbuild engine
+
+what would it mean to factor out this kind of more minimal engine
+what it actually looks like
+
+- minimal, functional model
+  four basic concepts
+  - keys: unambiguos name for some comutation you want to perform
+  - value: the result of a computation
+  - rule: how to produce a value for a key
+  - task: a runing instance of a rule
+    - a task can request other input keys as part of its work
+
+the core engine can be used directly for general purpose
+computation
+
+recursive functions foprma a natural graph each result
+depends on the recursive inputs
+
+### example: ackerman
+
+to build ackerman we encode the ackerman invocation we want
+to make as a key, we encode the integer result as a value,
+then we take those keys and we map them to tasks using our
+rules, and then the tasks themselves implement the ackerman
+function
+
+we have simple wrapper struct that wraps the integer pair
+that the arguments,
+
+it has a couple functions to convert it to and from a
+serialized representation the value is the same thing
+
+where it gets more interesting with rules
+
+the way llbuild works is you give it a delegate,
+
+it can handle this idea of work being generated on the fly,
+and the reason it can do it is you jhust give it a delegate,
+and you give it a function that provides it rules when it
+wants them
+
+so unlike a ninja file where all of the rules are present in
+advance, from the engines perspective it just has a function
+to request rules as they come in
+
+so in this case our function just decodes that key and will
+create a task if its requested
+
+it has some other stuff like it can report to you if it
+found a cycle
+
+so tasks are where the real work happens
+
+the way that the tasks work is that the engine will call
+back into your tasks as interesting stuff happens happens
+
+when a task is started, youre notified
+
+when the engine has computed a result you asked for, then
+its given to you
+
+when all of the inputs that your task has asked for have
+been computed, then it shluld complete
+
+## a new architecture
+
+requires:
+- library based compiler
+- extensible build system
+- compiler plugin
+  the las tthing we need to try to gete performance
+  imporments is this
+
+straw man proposal:
+
+## What's the status of this 2 years later?
+
+Funny you should ask! llbuild is alive and strong, and now
+powers the default build system used in Xcode 10. Getting
+the "new architecture" proposed here off the ground has
+continued to be difficult, mostly due to the challenge of
+refactoring the existing compilers, and that the payoffs
+only start to get realized once a large amount of work has
+been done. It is hard to unwind 40 years of CS-precedent for
+how compilers are built overnight, but I am still optimistic
+about the potential here!
+
+... and probably worth adding: since this was published
+llbuild's own Ninja implementation usually outperforms the
+actual Ninja on most real world situations we've seen (such
+as building LLVM/Clang on a variety of different hardware).
+
+\end{Verbatim}

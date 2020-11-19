@@ -1,19 +1,16 @@
 \documentclass[12pt, a4paper]{report}
 \usepackage[utf8]{inputenc}
 \usepackage{enumitem}
+\usepackage{fancyvrb}
+\usepackage{minted}
+\usepackage{wasysym}
+
+\usepackage[backend=biber,style=alphabetic,sorting=ynt]{biblatex}
+\addbibresource{tesina.bib}
+
 \usepackage{graphicx}
 \graphicspath{ {./images/} }
 
-\usepackage{minted}
-\usepackage{wasysym}
-\usepackage[
-backend=biber,
-style=alphabetic,
-sorting=ynt
-]{biblatex}
-\addbibresource{tesina.bib}
-
-\usepackage{fancyvrb}
 \usepackage[pdfpagelabels]{hyperref}
 \hypersetup{
     plainpages=false,
@@ -130,6 +127,7 @@ En la ausencia del LSP, los servicios son tipicamente implementados utilizando u
 Proveer el mismo servicio a otra herramienta de edicion requiere de un esfuerzo para adaptar el codigo existente para que el servicio pueda soportar las interfaces de la segunda herramienta.
 \cite{language_server_protocol_wiki}
 
+\noindent
 \includegraphics[width=0.9\textwidth]{lsp}
 
 LSP permite desacoplar los servicios de lenguaje del editor de tal manera que los servicios se pueden contener en un servidor de lenguaje de proposito general.
@@ -262,138 +260,85 @@ Cada una de estas computaciones mas pequeñas producira un resultado intermedio 
 La forma en que se eligio implementar la incrementalidad en el compilador de Rust es directa: una sesion de compilacion incremental sigue exactamente los mismos pasos que una sesion de compilacion batch.
 Sin embargo, cuando el flujo de control llegue a un punto en el cual esta a punto de computar un resulto intermedio no trivial, intentara cargar ese resultado del cache de compilacion incremental en disco en su lugar.
 Si existe una entrada valida en el cache, el copmilador puede saltear la computacion de ese dato en particular.
-Estas
+Este es un esquema (simplificado) de de las diferentes fases de compilacion y los resultados intermedios que producen:
+\cite{rust_blog_incremental_compilation}
 
-\begin{verbatim}
-- However, when control flow reaches a point where it is
-about to compute some non-trivial intermediate result, it
-will try to load that result from the incremental
-compilation cache on disk instead.
+\noindent
+\includegraphics[width=0.9\textwidth]{woe16_compiler_phases}
 
-- If there is a valid entry in the cache, the compiler can
-just skip computing that particular piece of data. Let's
-take a look at a (simplified) overview of the different
-compilation phases and the intermediate results they
-produce:
-
-- First the compiler will parse the source code into an
-abstract syntax tree (AST). The AST then goes through the
-analysis phase which produces type information and the MIR
-for each function. After that, if analysis did not find any
-errors, the codegen phase will transform the MIR version of
-the program into its machine code version, producing one
-object file per source-level module. In the last step all
-the object files get linked together into the final output
-binary which may be a library or an executable.
-
-- So, this seems pretty simple so far: Instead of computing
-something a second time, just load the value from the cache.
-Things get tricky though when we need to find out if it's
-actually valid to use a value from the cache or if we have
-to re-compute it because of some changed input.
-\end{verbatim}
+Primero, el compilador parse el codigo fuente en un arbol de sintaxis abstracto (AST).
+El AST pasa luego a la fase de analisis que produce informacion de tipos y el MIR para cada funcion.
+Luego de eso, si el analisis no encontro ningun error, la fase de generacion de codigo transformara la version MIR del programa en su version de codigo maquina, emitiendo un archivo objeto por cada modulo de codigo.
+En la ultima fase todos los archivo objeto son linkeados juntos en el binario final, que puede ser una libreria o un ejecutable.
+Hasta ahora las cosas parecen bastante simples: en lugar de computar algo por segunda vez, sencillamente cargar el valor desde el cache.
+Las cosas se complican cuando es necesario saber si es efectivamente valido usar un valor del cache o si hay que recomputarlo porque alguna entrada ha cambiado.
 \cite{rust_blog_incremental_compilation}
 
 \addcontentsline{toc}{section}{Seguimiento de Dependencias [Olle20]}
 \section*{Seguimiento de Dependencias [Olle20]}
 
-\begin{verbatim}
-- Rock, Shake, Salsa
+El seguimiento, o \textit{tracking}, de dependencias, es provista por librerias tales como Rock, Shake, o Salsa.
+Estas librerias proveen parte de la funcionalidad necesaria para crear compiladores basados en queries.
 
-- This functionality is provided by Rock, a library that
-packages up some functionality for creating query-based
-compilers.
-
-- Rock is an experimental library heavily inspired by Shake
-and the Build systems à la carte paper.
-
-- It essentially implements a build system framework, like
-- make.
-
-- Build systems have a lot in common with modern compilers
-since we want them to be incremental, i.e. to take advantage
-of previous build results when building anew with few
-changes.
-
-- But there's also a difference: Most build systems don't
-care about the types of their queries since they work at the
-level of files and file systems.
-
-- Build systems à la carte is closer to what we want.
-
-- There the user writes a bunch of computations, tasks,
-choosing a suitable type for keys and a type for values.
-
-- The tasks are formulated assuming they're run in an
-environment where there is a function fetch of type Key ->
-Task Value, where Task is a type for describing build system
-rules, that can be used to fetch the value of a dependency
-with a specific key.
-
-- In our above example, the key type might look like this:
-
-- The build system has control over what code runs when we
-do a fetch, so by varying that it can do fine-grained
-dependency tracking, memoisation, and incremental updates.
-
-- Build systems à la carte is also about exploring what kind
-of build systems we get when we vary what Task is allowed to
-do, e.g. if it's a Monad or Applicative.
-
-- In Rock, we're not exploring that, so our Task is a thin
-layer on top of IO.
-
-- A problem that pops up now, however, is that there's no
-satisfactory type for Value.
-
-- We want fetch (ParsedModuleKey "Data.List") to return a
-ParsedModule, while fetch (TypeKey "Data.List.map") should
-return something of type Type.
-\end{verbatim}
+Rock es una libreria experimental fuertemente inspirada por Shake y el paper \textit{Build systems à la carte} \cite{mokhov2018build}.
+Esencialmente implementa un framework de sistema de construccion \textit{build system framework}, como \texttt{make}.
+Los sistemas de construccion tienen mucho en comun con compiladores modernos dado que tambien queremos que sean incrementales, i.e. que aprovechen los resultados de construcciones anteriores al construir uno nuevo con pocos cambios.
+Sin embargo, tambien tienen una diferencia: a la mayoria de los sistemas de construccion no les importa el tipo de sus queries dado que trabajan sobre archivos y sistema de archivos.
+El esquema detallado en \textit{Build systems à la carte} se aproxima mejor a lo necesario en el caso de un compilador.
+En esta publicacion detallan un sistema en el cual el usuario escribe un conjunto de computaciones, tareas, que toman una clave y retornan un valor, y elige un tipo adecuado para las claves y otro para los valores.
+Las tareas se formulan asumiendo que van a ser ejecutadas en un entorno en el cual existe una funcion \texttt{fetch} de tipo \texttt{Key -> Task[Value]}, donde \texttt{Task} es un tipo que describe las reglas del sistema de construccion, la cuale puede ser usada para obtener los valores de una dependencia con una clave dada.
+El sistema de construccion tiene control sobre que codigo corre al momento de ejecutar \texttt{fetch}, de tal manera que se puede variar la granularidad del seguimiento de dependencias, memoisacion, y actualizaciones incrementales.
+\textit{Build systems à la carte} tambien explora que tipo de sistemas de construccion obtenemos cuando variamos lo que puede realizar una tarea \textit{Task}, e.g. si es una monada o un aplicativo.
+Un problema que surge inmediatamente es que no hay ningun tipo satisfactorio para \texttt{Value}.
+E.g. puede haber una query para obtener el modulo donde esta definido un tipo, y otra para obtener la representacion del tipo dado el nombre calificado de un tipo.
 \cite{olle_query_based}
 
-\addcontentsline{toc}{section}{Indexed queries [Olle20]}
-\section*{Indexed queries [Olle20]}
-
-\begin{verbatim}
-- Rock allows us to index the key type by the return type of
-the query. The Key type in our running example becomes the
-following GADT:
-
-data Key a where
-  ParsedModuleKey :: ModuleName -> Key ParsedModule
-  ResolvedModuleKey :: ModuleName -> Key ResolvedModule
-  TypeKey :: QualifiedName -> Key Type
-
-- The fetch function gets the type forall a. Key a -> Task
-a, so we get a ParsedModule when we run fetch
-(ParsedModuleKey "Data.List"), like we wanted, because the
-return type depends on the key we use.
-
-- Now that we know what fetch should look like, it's also
-worth revealing what the Task type looks like in Rock, more
-concretely.
-
-- As mentioned, it's a thin layer around IO, providing a way
-to fetch keys (like Key above):
-
-- The rules of our compiler, i.e. its "Makefile", then
-becomes the following function, reusing the functions from
-above:
-
-rules :: Key a -> Task a
-rules key = case key of
-  ParsedModuleKey moduleName ->
-    fetchParsedModule moduleName
-  ResolvedModuleKey moduleName ->
-    fetchResolvedModule moduleName
-  TypeKey qualifiedName ->
-    fetchType qualifiedName
-\end{verbatim}
-\cite{olle_query_based}
+% \addcontentsline{toc}{section}{Indexed queries [Olle20]}
+% \section*{Indexed queries [Olle20]}
+%
+% - Rock allows us to index the key type by the return type of
+% the query. The Key type in our running example becomes the
+% following GADT:
+%
+% \begin{minted}{haskell}
+% data Key a where
+%   ParsedModuleKey :: ModuleName -> Key ParsedModule
+%   ResolvedModuleKey :: ModuleName -> Key ResolvedModule
+%   TypeKey :: QualifiedName -> Key Type
+% \end{minted}
+%
+% - The fetch function gets the type forall a. Key a -> Task
+% a, so we get a ParsedModule when we run fetch
+% (ParsedModuleKey "Data.List"), like we wanted, because the
+% return type depends on the key we use.
+%
+% - Now that we know what fetch should look like, it's also
+% worth revealing what the Task type looks like in Rock, more
+% concretely.
+%
+% - As mentioned, it's a thin layer around IO, providing a way
+% to fetch keys (like Key above):
+%
+% - The rules of our compiler, i.e. its "Makefile", then
+% becomes the following function, reusing the functions from
+% above:
+% \cite{olle_query_based}
+%
+% \begin{minted}{haskell}
+% rules :: Key a -> Task a
+% rules key = case key of
+%   ParsedModuleKey moduleName ->
+%     fetchParsedModule moduleName
+%   ResolvedModuleKey moduleName ->
+%     fetchResolvedModule moduleName
+%   TypeKey qualifiedName ->
+%     fetchType qualifiedName
+% \end{minted}
+% \cite{olle_query_based}
 
 \addcontentsline{toc}{section}{Caching [Olle20]}
 \section*{Caching [Olle20]}
+
 
 \begin{verbatim}
 - The most basic way to run a Task in Rock is to directly
@@ -482,6 +427,11 @@ Rustc, el compilador de rust, tiene su propia implementacion de queries.
 \addcontentsline{toc}{section}{Rustc Dependency graphs [Woe16]}
 \section*{Rustc Dependency graphs [Woe16]}
 
+Existe un modelo formal que puede usarse para modelar los resultados intermedios de una computacion y su propiedad de estar actualizad de una manera directa: los grafos de dependencias.
+Cada entrada y cada resultado intermedio son representados como un nodo en un grafo dirigido.
+Los arcos en el grafo representan cual resultado intermedio o entrada puede tener influencia en otro resultado intermedio.
+En general los arboles
+
 \begin{verbatim}
 - There is a formal method that can be used to model a
 computation's intermediate results and their individual
@@ -510,6 +460,12 @@ relied on anymore.
 
 \addcontentsline{toc}{section}{Dependency Tracking in the Compiler [Woe16]}
 \section*{Dependency Tracking in the Compiler [Woe16]}
+
+\noindent
+\includegraphics[width=0.9\textwidth]{woe16_compiler_dep_graph}
+
+\noindent
+\includegraphics[width=0.9\textwidth]{woe16_compiler_cache_purge}
 
 \begin{verbatim}
 - When compiling in incremental mode, we always build the
@@ -670,785 +626,11 @@ Los dos ejes principales a lo largo de los cuales se buscara mejorar la eficienc
 
 \addcontentsline{toc}{section}{Anders Hejlsberg on Modern Compiler Construction}
 \section*{Anders Hejlsberg on Modern Compiler Construction}
-
 \cite{hejlsberg_modern_compiler_construction}
 
 \addcontentsline{toc}{section}{Build Systems a la Carte}
 \section*{Build Systems a la Carte}
-
 \cite{mokhov2018build}
-
-\addcontentsline{toc}{section}{A New Architecture for Building Software}
-\section*{2016 LLVM Developers’ Meeting: D. Dunbar “A New Architecture for Building Software”}
-
-\cite{dunbar2016}
-
-\begin{Verbatim}[fontsize=\small]
-
-## Overview
-
-compile times impact developers
-clang was designed from the beginngin to be a very fast c/c++
-that was one of the motivations
-
-the strategy was
-- to have a tuned lex and parse implementation
-- focused heavily on having a low overhead -O0 path, no unnecesary
-  optimizations on -O0, and do things such as fast instruction
-  selection, etc
-- redesigned pch (pre compiled headers), try to pull the minimal
-  amount of data from headers
-- integrated the assembler into the compiler, to avoid the time of
-  emitting assembly code and loading it back into the assembler
-
-this proved succesful, clang was 3x faster than gcc
-but over time this lead has diminished
-in part because gcc itself got faster but mainly because
-
-performance regresses over time because features are added, and
-tuning can break
-
-improving compile time, options:
-- distributed compilation
-- improved caching, ideally distributed and shared
-- do less work
-
-there are things that in the case of clang could be done today,
-such as reuse the frontend for compiling several files sharing the
-same compile flags, allowing the frontend to better chache
-e.g. file stat calls and other metadata, or build pch for hotly
-edited files.
-
-while this works, the problem is that there is no control in the
-compiler over how it is invoked, as this depends on the build system
-one proposal is to build a compiler-service, but this presents other
-problems
-
-## How we build software today
-
-for most languages, traditional unix/build system model
-- compiler runs as a separate process
-- primitive mechanisms for communicating dependencies between build
-  systems and the compiler
-  - the build system tells us about our inputs andoutpus through
-    command line arguemtns
-  - mechanism by which the compiler can write out additional
-    dependencies the build system can ingest, we dont even have a
-    real file format we use for that, we just write out a makefile
-    format and force the build system to ingest it
-  - fixed input/output, we only have a limited set of places where
-    were supposed read and write data from, if the compiler wanted
-    to cache data on the side, we dont even have an agreed upon
-    location to do that
-
-so from a certain perspective, this is basically an api contract,
-and its an api that hasnt changed in decades
-we last major advancement was this argument that lets the compiler
-send dependencies back to the build system
-
-## how software could be built
-
-what would happen if we were willing to break this api?
-
-things that could be done
-- ad hoc lookup tables:
-  if you think about the lifetime of the compiler throughout the
-  build, there are many places where the compiler ends up computing
-  some amount of information in every build that could be
-  accelerated through a lookup table
-  and if we had a way to keep that lookup table around, that would
-  make the build faster
-  but today that would require us to serialize it out to disk and
-  read it back in, and that would mitigate some of the speedup, so
-  we dont do that
-- early exit via output signatures:
-  we could implement in the compiler the ability to take a signature
-  of the llvm ir after it comes out of codegen, and if that code
-  signature is the same as the last time that file was compiled,
-  we can skip the backend, we know we are going to get the same
-  object file out
-  this is a big win if you change a comment in a file that causes
-  all the project to rebuild, but none of your object files are
-  going to change.
-- dealing with redundant template instantiaions
-  we spend a fair amount of time throughout the build doing a lot of
-  work for the same template instantiation
-  creating them, typechecking them, generating the code for them,
-  and then finally passing them all off to the linker, for it to get
-  rid of most of them
-
-for all these things whats need is the ability to evolve the api
-between the build systema and the compiler
-
-## what about a module cache?
-
-it caches something throughout the whole build.
-
-yes:
-- automatically builds modules when needed
-- shares results across the build
-- no build system changes needed
-
-nonexample because it involves significant implementation complexity
-- has posix file lockingg in order to manage coordination
-- has its own cache consistency management scheme, few debugging
-  tools, it has to watch and understand when it needs to rebuild
-  modules
-- has to have its own eviction mechanism (automatic pruning, tuning
-  parameters)
-- opaque to the build system scheduler, if one starts a bunch of build
-  jobs and they all want the same model, from the build systems
-  perspective, it going to be blocked, waiting for all of those, but
-  it actually could be doing more work on the core that it has, it
-  just doesnt know that.
-
-## ideal model for building software
-
-- what we really want is some kind of flexible api between the c
-  ompiler and the build system
-
-goals:
-- it should be really easy to share redundant work, if we see a place
-  in the compiler where we realize its redundant throughout the
-  lifetime of the build, we should be able to implement that quickly
-- optimize the compiler for the entire build: most users, other than
-  compiler engineers, dont care about objetct files, what they care
-  about is getting their final product out
-  thats the situation we should optimize the compiler at, being fast
-  for doing the entire build
-- conversely, we should be able to optimize the build system via a
-  rich compiler api
-  if theres a place where the compiler realizes it could do some
-  amount of work in parallel, it would be relly nice if we could talk
-  back to the build system and communicate with it so that the job can
-  be scheduled effectively
-- consistent incremental builds and debuggable architecture: one of
-  the benefitrs of the curent strategy is that we try very hard on the
-  compiler to make this strong guarantee that the same input will
-  produce the exact same object file output, that 's a very good basis
-  for having reliable reproducible builds.
-
-- need ability yo integrate the build system and the compiler
-
-requires:
-- library based compiler: a compiler that has been architected to be
-  able to be used that way
-- extensible build system, a build system that has been designed with
-  the idea in mind that some of the tools that it interacts with
-  should be able to plug in more deeply than just as an extensible
-  process.
-  when you call make or ninja, they expect to call you via subprocess
-  and theres a few ways you can interact with them but not a lot
-- compiler plugin for that
-
-## introducing llbuild
-
-goals:
-- ignore build description / input language
-  not make a new syntax as a replacement for cmake
-  most build systems, somewhere inside they have a little engine
-  that is capable of evaluating a dependency graph
-  that engine is usually fairly simple
-- with llbuild focus on building a powerful engine
-  - support work being discovered on the fly
-    very few build can support the situation where your executing
-    some task and during the execution of that task you realize you
-    need to do more work
-  - scale to millions of tasks
-    because the goal was to take our existing build and partition
-    them into much smaller pieces to be able to get better
-    incremental beehaviour it really needed to be able to scale
-  - support sophisticated scheduling
-    during a build of llvm we have a lot of cpu boudn stuff running
-    the compipler, and we have a lot of io bound stuff, like runner
-    the linker , which sucks in all the object files
-  - powerful debugging tools
-- support a pluggable task api
-
-### llbuild architecture
-
-- flexible underlying core engine
-  the llvm ir equivalent, a common denominator between the high level
-  things, build systems, and the lower level optimization
-  - library for persistent, incremental computation
-  - heavily inspired by a haskell build system called shake
-  - low-level
-    - inputs and outputs are byte strings
-      there are no files, just strings of bytes, and the expectation
-      that as a client, you'll encode data in those if necessary
-    - functions are abstract
-    - use c++ api between tasks
-  - on top of this core: hiher-level build systems are built on the
-    core there's a ninja implementation on top of this, a package
-    manager
-
-### llbuild engine
-
-what would it mean to factor out this kind of more minimal engine
-what it actually looks like
-
-- minimal, functional model
-  four basic concepts
-  - keys: unambiguos name for some comutation you want to perform
-  - value: the result of a computation
-  - rule: how to produce a value for a key
-  - task: a runing instance of a rule
-    - a task can request other input keys as part of its work
-
-the core engine can be used directly for general purpose
-computation
-
-recursive functions foprma a natural graph each result
-depends on the recursive inputs
-
-### example: ackerman
-
-to build ackerman we encode the ackerman invocation we want
-to make as a key, we encode the integer result as a value,
-then we take those keys and we map them to tasks using our
-rules, and then the tasks themselves implement the ackerman
-function
-
-we have simple wrapper struct that wraps the integer pair
-that the arguments,
-
-it has a couple functions to convert it to and from a
-serialized representation the value is the same thing
-
-where it gets more interesting with rules
-
-the way llbuild works is you give it a delegate,
-
-it can handle this idea of work being generated on the fly,
-and the reason it can do it is you jhust give it a delegate,
-and you give it a function that provides it rules when it
-wants them
-
-so unlike a ninja file where all of the rules are present in
-advance, from the engines perspective it just has a function
-to request rules as they come in
-
-so in this case our function just decodes that key and will
-create a task if its requested
-
-it has some other stuff like it can report to you if it
-found a cycle
-
-so tasks are where the real work happens
-
-the way that the tasks work is that the engine will call
-back into your tasks as interesting stuff happens happens
-
-when a task is started, youre notified
-
-when the engine has computed a result you asked for, then
-its given to you
-
-when all of the inputs that your task has asked for have
-been computed, then it shluld complete
-
-## a new architecture
-
-requires:
-- library based compiler
-- extensible build system
-- compiler plugin
-  the las tthing we need to try to gete performance
-  imporments is this
-
-straw man proposal:
-
-## What's the status of this 2 years later?
-
-Funny you should ask! llbuild is alive and strong, and now
-powers the default build system used in Xcode 10. Getting
-the "new architecture" proposed here off the ground has
-continued to be difficult, mostly due to the challenge of
-refactoring the existing compilers, and that the payoffs
-only start to get realized once a large amount of work has
-been done. It is hard to unwind 40 years of CS-precedent for
-how compilers are built overnight, but I am still optimistic
-about the potential here!
-
-... and probably worth adding: since this was published
-llbuild's own Ninja implementation usually outperforms the
-actual Ninja on most real world situations we've seen (such
-as building LLVM/Clang on a variety of different hardware).
-
-\end{Verbatim}
-
-\addcontentsline{toc}{section}{Responsive Compilers}
-\section*{Responsive compilers - Nicholas Matsakis - PLISS 2019}
-\cite{niko2019responsive}
-
-\begin{Verbatim}[fontsize=\small]
-
-# pipelines and passes
-
-when I started writing compilers, we used the dragon book I
-learned this classic structure of how to write a compiler
-which was all about passes
-
-that is precisely how rustc used to look
-
-the reason that there has been a change is that the way you
-interact with comilers has changed
-
-the way the rust compiler was written and the way compilers
-usually work is this batch compilation model
-
-where you run it, process the whole source and you produce
-an output and maybe get an error out of it
-
-these days people are working with ides and you want a
-different way to interact with the source when your in this
-model
-
-you want to take messed up inputs, make sense of them, you
-want to be able to do compiletions and jump to definitions
-in an interactive way
-
-my goal today:
-what if the dragon book were written today
-
-i think there are more questions marks than answer, we dont
-have all the things written down to make the book
-
-but I have a lot of experiences of what we tried and the
-challenves
-
-the first thing to learn about this environment today is
-that there has been a big shift the last couple of years in
-how ides are written is that microsoft introduced vs code,
-which is an amazing editor, but among the many amazing
-things it introduced is the LSP, which is an intermediate
-protocol for interfacing between the language that's being
-compiled and the editor that's interacting, wo that neither
-have to be tied to each other
-
-it used to be that when you wrote an eclipse plugin for your
-language it just worked in exclsipse, and then if you wanted
-to 4extend for netbeans, and emacs, and vim, etc
-
-but LSP lets you sidestep that
-
-so for example in the rust compiler we have a language
-service, we actually ahve to and they work for emacws, vi,
-whatever
-
-# The "responsive" compiler
-
-- compiler as an actor
-- editor sends diffs and requests completions, diagnostics
-- compiler responds
-
-what you wind up in this model is that instead of having the
-compiler be something that you run in the command line it's
-more of an actor, the editor is sending you diffs of the
-files youre compoiling, and you are responding to them and
-sending back diagnostics,
-
-and it might say, ok, we want to know what are the
-completions at this point, and your compiler responds with a
-vector of responses
-
-key point: need to be able to respond as quickly as possible
-
-so you wind up with a pretty different structure
-
-andd you ahve to think about what is the minimum information
-you need to answer that requests, and can you process just
-that so you can get responses as fast as possible
-
-so instead of a type checker that walks all the sources and
-does all the things for all the functions, ok i just need to
-type  check this statement, how much context do i need to do
-that
-
-and i go back out to the function, i have to go back out to
-other functions sometimes, but not all of them, find their
-signatures, etc
-
-# demand driven
-
-so what weve been trying to do is move to a more demand
-driven architecture
-
-- start from goal
-- figure out what is needed for that
-
-you have a given goal you need to do, and that goal is
-implemented by some function that uses other functions, and
-you go backwards, but you try to keep this set to a minimum
-
-at the end of the day you still have thesed traditional
-compiler passes, logical, but you might not be executing
-them completely and you might now tbe executing them in
-order
-
-# why should you care about IDEs?
-
-there are some things ive noticed in trying to make this
-transformation that surprised me
-
-and there some reasons to try to do an ide friendly
-approach, even if its not a full ide, from the beginning
-
-- you have to write code in this language your making
-- it really informs your language design,
-  you becoime much more aware of what depoendencies you need
-  to figure out bits of information and that might lead you
-  to make or not make certain desicions
-- stric phase separation is impossible anyway
-
-# dependencies matter
-
-rust allows arbitrryu nesting of delcarations inside
-fuinctions an example of something we would not have done
-had we implemented ides earlier on
-
-rust has always allowed you to nest things rather
-arbitrarily for example a function with a struct inside of
-it
-
-thats kinda handy, sometimes you want some local data that's
-not needed outside the function
-
-fn foo() {
-  // Equivalent to a struct declared at the root of the
-  // file, but only visible inside this function.
-  struct Bar{}
-  let x = Bar{};
-}
-
-you can also put methods on the struct
-
-fn foo() {
-  struct Bar{}
-  impl Bar {
-    pub fn method() { ... }
-  }
-  let x = Bar{};
-}
-
-a side effect of this is that auto-completion requires
-looking inside a lof of function bodies
-
-what tha means is that I could have a struct visible from
-outside the function, and put methods on it inside the
-function, and I can call those methods from outside the
-function, because the methods are dispatched based on the
-type, and we attached the method to type Bar, and if I have
-an instance of Bar from outsidfe the function I can call and
-what that means is that I'm doing completion on a value of
-type Bar, I really need to parse the inside of my function
-bodies to figure out if there is an impl that muight be
-releant, or else I wont get those methods
-
-struct Bar {}
-fn some_method() {
-  let bar = Bar::new();
-  bar. // <-- what methods should we offer as
-       // auto-completion here?
-}
-
-# strict phase separation is impossible anyway
-
-the other reason that led us in this direction, is that in
-most compiler that I've worked on , if you have a strict
-phase spearation in which you fully resolve all the symbols,
-then type check all the bodies, and then... it e3nds up kind
-of constraining, and you often need to process your source
-in a difficult order
-
-in many languages its a constraint you dont want
-
-Rust, for example, lets you do this:
-
-const LEN: u8 = 1 + 1 + 1;
-const DATA: [u8; LEN] = [1, 1, 1]:
-
-what this means now is that there is an interdependency, in
-order to know the full type of DATA, I have to evaluate the
-constant LEN, and in order to evaluate the constant LEN, I
-have to type check its body and execute in some way,
-interpret it, symbolically execute it, to figure out what
-it's value is, and that means I can't fully type check all
-the constants in one order, without considering the
-dependencies between them before I can even figure out the
-type of data.
-
-What we used to do is some horrible hack.
-
-We essentially had two implementations of some parts of the
-compiler, because we needed to have some subset of the
-typechecker and evaluator that was good enough to evaluate
-things like LEN and that could execute at any part on
-demand, and then we had the real code that did the full
-check that came after.
-
-It was a horrible pain.
-
-And now in this more demand based system this isnt a problem
-because we can go and execute LEN on its own.
-
-What if we were to do this?
-
-const LEN: u8 = DATA[0] + DATA[1] + DATA[2];
-const DATA: [u8; LEN] = [1,1,1];
-
-Usually when you're doing this sort of thing you end up
-needed to detect cycles and this kind of falls out out of
-the framework we're working on basically.
-
-Other examples of phase separation:
-- inferred types across function boundaries in e.g ML
-- in rust, theres a bunch of things in the logic language:
-  specialization, which requires solving some traits
-- java and its lazy class file loading, how many different
-  things the dot operator does in java, you will find that
-  there is a bunch of lazyness, the set of classes a given
-  classs can touch is determined as you walk the file you
-  compile
-- how racket deals with phase separation and scheme macros
-
-in a lot of languages you find you want to evaluate some
-subset of the source and type check and be able to woirk
-with thme without necesarily processin ght whoel thing
-
-# Not a solved problem
-
-what have we been actually doing to solve this
-
-- hand coded
-- salsa
-- more formal technique
-  - attribute grammars
-  - datalog or structured queries
-
-rustc takes an approach based on a framework called salsa
-it enables you to still write your compiler in a general
-purpose programming language what feels familiar
-
-there are two different alternative to this,
-
-one of them, the hand coded version, ive seen more in
-practice in other places, is not having a framework but
-thinking very carefully about things, doing the same things
-but open coded, doing things by hand figuring out if im
-going to type check this, i need to figure out these
-dependencies, and making it work
-
-that is of course very practical, it just can have bugs,
-incremental inconsistencies, etc if you have forgotten about
-a dependency between things
-
-another way is more formal, higher level expression
-
-then you have to make sure that everything you do fits in to
-this framework or extend the framework
-
-so salsa is kind of a middle ground
-
-# Salsa
-- high level idea:
-  - inputs
-  - derived queries
-
-- most closely related work:
-  - adapton
-  - glimmer from the ember web framework
-  - build systems a la carte
-
-the high level idea of this framework is that you separate
-out the inputs to your compilation and then a bunch of
-derived stuff.
-
-the derived queries are basically pure functions that get to
-demand other results/queries, that they needs, some of which
-may be inputs and when we use one of these functions we
-track what bits of data did it use and ultimately which
-inputs did it use, and then whene theres a cahnge to one of
-these inputs we can propagate the change and try to avoid re
-executing some of these things.
-
-there are a lot of systems in this space
-
-the three that I know of are these
-
-two of these are academic, adapton approach by mathew hammer
-and BSALC a paper by simon peyton jones that built a very
-flexible system in haskell that has a similar basis
-
-teh difference would be that ours is in between BSALC allows
-you to customize a lot of different thing and tweak many
-things, adapton is also a little more flexible but also more
-complicated
-
-an interesting approach is glimmer engine in the ember web
-framework, which does incremental updates. i havent looked
-deeply at what react or elm does but i imagine they are
-kinda related
-
-turns out this is a problem that applies to many areas, not
-just compilation
-
-# Salsa core idea
-\end{Verbatim}
-
-\begin{minted}{rust}
-let mut db = Database::new();
-loop {
-  db.set_input_1( ... );
-  db.set_input_2( ... );
-
-  db.derived_value_1();
-  db.derived_value_2();
-}
-\end{minted}
-
-\begin{Verbatim}
-when you are writing a program in salsa it kinda looks like
-this and then you essentialy have a loop where you set some
-inputs, and that's like when you get a diff from the editor,
-and you compute some derived values
-
-and the idea is that these things are memoized, so whenever
-you ask for a derived value it will always be up to date,
-for whatever the input changes you have made
-
-# Entity component System
-
-- entity: unit of entity
-- component: data about an entity
-\end{Verbatim}
-
-\begin{minted}{rust}
-fn move_left(entity: Entity, amount: usize) {
-  let pos = DB.position(entity);
-  pos.x -= amount;
-  DB.set_position(entity, pos);
-}
-\end{minted}
-
-\begin{Verbatim}
-when you really try to write a whole compiler withj this
-kind of model one of the things that arises is this
-relationship to ECS, this is kind of a right turn but I want
-to explain this as a sort of background as a way to think
-about how this feels in practice
-
-an ECS is something that arises from game proigramming and
-is an alternative to OOP
-
-where you separate out data and the identity
-
-so in an OOP you have a class and you make an instance of it
-and all of iots dasta and its operation are defined at that
-moment when you created it
-
-whereas in an ECS you create a new entitty aND it has
-nothing associated with thi but identity, and then you can
-have separately data that you attache to it
-
-in games this is useful because of the very dynamic nature
-of data in a game.
-
-it allows you to be unstructured and in a compilar that part
-is not as importnat but its pretty useful
-
-# Entities in a compiler
-
-- often called symbols
-- things like
-  - input files
-  - struct declarations
-  - fields
-  - function declarattions
-  - parameters or local variables
-- something "addressable" by other parts of the system
-
-so what you wind iup with is a system where you entities
-correspond to things that get declared in the program
-language and you layer on different bits of data about this
-symbols so you might have a type, etc
-
-and ther reason you layer this on is this is what allows us
-to be so demand driven
-
-we can ask about the type of a symbol and get that without
-getting all the other bits of data that might eventually
-come to be associated with it
-
-# Components in a compiler
-
-things like
-- the type of an entity
-- the signature of a function
-
-there are a couple different things that are like
-components, type is one, signature is another, sometimes
-there are more like unit results, or lists of errors, the
-result of applying some analysis that can reject
-
-# Salsa queries
-
-Q(K0 .. Kn) -> V
-- Q is the query name (like AST)
-- the K0 .. Kn are the query keys
-  - atomic values of any type
-- The V is the value associated with the query
-
-the basis structure of this salsa  systems is that you have
-queries, which have a name
-its not quite an ECS in that we dont have a formal concept
-of entities instead what we have is queries which are kind
-of like components
-a query name might be like the type or the signature
-and then we have a set of keys that go into the query
-and often there is only one
-
-# Example queries
-# Query group
-# Input queries
-# Derived Queries
-# How salsa works
-# Recomputation (simplified)
-# But suppose input change is not important
-# Recomputation (less simplified)
-# Order matters
-# Minimizing redundant checks
-# Garbage collection
-# General idea
-# Layering
-# Represent layers with maps
-# Rust compiler of yore
-# Trees are your friends
-# Interning
-# Tree-based entities also give context
-# Signature
-# Tightening queries with projection
-# The "outer spine"
-# Error handling
-# Recovery from day one
-# Example: error type
-# Diminishing returns
-# Handling cycles
-# Example: inlining (take 1)
-# Example: inlining (take 2)
-# Non-deterministic results
-# One better approach
-# Other cases involving cycles
-# Tracking location information ("spans")
-# What to put in your AST
-# Incremental re-parsing
-# Example: swift red and black trees
-# Alternative: "zooming out" or "zooming in"
-# Threading
-# Salsa's threading model
-# Cancellation
-# Conclusion
-\end{Verbatim}
 
 \addcontentsline{toc}{section}{How Salsa Works}
 \section*{How Salsa Works (2019.01)}
