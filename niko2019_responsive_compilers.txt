@@ -420,16 +420,30 @@ Q(K0 .. Kn) -> V
   - atomic values of any type
 - The V is the value associated with the query
 
-the basis structure of this salsa  systems is that you have
+the basic structure of this salsa  systems is that you have
 queries, which have a name
 its not quite an ECS in that we dont have a formal concept
-of entities instead what we have is queries which are kind
+of entities, instead what we have is queries which are kind
 of like components
 a query name might be like the type or the signature
 and then we have a set of keys that go into the query
 and often there is only one
+so the type of a given funciton, or the type of a given variable,
+but sometimes there are more than one, so there can be any number
+
+and when yopu execute this query you get back some value that is the rssult
+
+of these things, the keys and the values have to be values in the saense they can be copied and can be compared for equality
+simple values
 
 # Example queries
+
+some examples of the kinds of queries we might have
+
+-
+
+they range from
+
 # Query group
 # Input queries
 # Derived Queries
@@ -469,4 +483,5 @@ and often there is only one
 # Salsa's threading model
 # Cancellation
 # Conclusion
+
 \end{Verbatim}
