@@ -2,8 +2,6 @@
 \section*{Responsive compilers - Nicholas Matsakis - PLISS 2019}
 \cite{niko2019responsive}
 
-\begin{Verbatim}[fontsize=\small]
-
 # pipelines and passes
 
 when I started writing compilers, we used the dragon book I
@@ -438,50 +436,417 @@ simple values
 
 # Example queries
 
+  input_text(FileName)
+  ast(FileName) -> Ast
+  signature(Entity) -> Signature
+  completions(FileName, Line, Column) -> Vec<String>
+
 some examples of the kinds of queries we might have
-
--
-
 they range from
 
 # Query group
+
+  #[salsa::query_group]
+  trait CompilerDatabase {
+    #[salsa::input]
+    fn input_text(&self, filename: FileName) -> String;
+    fn ast(&self, filename: FileName) -> Ast;
+    fn signature(&self, entity: Entity) -> FnSignature;
+  }
+
 # Input queries
+
+  //  #[salsa::input]
+  //  fn input_text(&self, filename: FileName) -> String;
+  let text = db.input_text(filename);
+  db.set_input_text(filename, text);
+
+  Input queries are essentially a field:
+      The #[salsa::input] annotation generates accessors
+
 # Derived Queries
+
+  // fn ast(&self, filename: FileName) -> Ast;
+  fn ast(
+    db: &impl CompilerDatabase,
+    filename: FileName,
+  ) -> Ast {
+    let input_text = db.input_text(filename);
+    ... /* implement parser here */ ...
+  }
+
+  Derived queries are defined by a function:
+      The db parameter is the database, gives access to other queries
+      Given keys, return results
+
 # How salsa works
+
+  db.ast("foo.rs")
+
+  Database contains:
+      global revision counter
+      one map per query (e.g., ast)
+      maps query key to:
+          Memoized result
+          Vector of dependencies ([input_text("foo.rs")])
+          Revision when last changed
+
 # Recomputation (simplified)
+
+  When db.ast("foo.rs") is invoked:
+
+  If no entry yet, execute query and store result.
+  Otherwise, if any input dependency is out of date:
+      Re-execute ast function, recording new result + dependencies
+      Update the "last changed" revision
+
+  db.signature(..)
+
+  Current revision: R2
+  db.signature(..) -- changed in R1
+  db.ast(..) -- changed in R1 ← out of date
+  db.input_text(..) -- changed in R2
+
 # But suppose input change is not important
+
+  Before:
+
+  // foo.rs
+  fn foo() {
+    do_something();
+  }
+
+  After:
+
+  // foo.rs
+  fn foo() {
+    do_something(); // FIXME
+  }
+
 # Recomputation (less simplified)
+
+  When db.ast("foo.rs") is invoked:
+
+  If no entry yet, execute query and store result.
+  If any input dependency is out of date:
+  Re-execute ast function, recording new result + dependencies
+  If the new result is different from old result:
+      Update the "last changed" revision
+
 # Order matters
+
+  fn a(db: &impl Database) {
+    if db.b() {
+      db.c();
+    } else {
+      db.d();
+    }
+  }
+
+  Input dependencies of a:
+      b, c, and d
+  If b were true in R1, we execute c
+  In R2, if b is false, c should never be executed
+
 # Minimizing redundant checks
+
+  For each memoized value, track:
+      "Last changed" revision
+      "Last checked" revision
+  Update "last checked" revision when value is updated
+  Ensures that we only execute a value once per revision
+
 # Garbage collection
+
+  Memoized results from previous revisions may no longer be relevant
+  But GC can be quite efficient:
+      Execute "master query"
+      Sweep any value whose "last checked" revision was not updated
+  Key idea:
+      The master query doubles as the mark
+
 # General idea
+
+  A --> C --> E --> F --> G
+              ^
+              |
+  B --> D ----+---> H
+
+  Re-execute the "early steps"
+  But cut off as quickly as you can
+
 # Layering
+
+  Common pattern:
+      produce a base structure
+      other queries "layer" structure on top
+  Example:
+      parser produces AST
+      name resolution resolves names to entities
+      type check adds types
+
 # Represent layers with maps
+
+  Give each node in the AST a numeric id AstId
+  Name resolution produces Map<AstId, Entity>
+  Type-check produces Map<AstId, Type>
+
 # Rust compiler of yore
+
+  one big ast
+  nodes in the assigned a pre-index (NodeId)
+  this ID was used everywhere
+
+  fn foo() { // node 0
+    let x = 3; // node 1
+  }
+  fn bar() { // node 2
+    let y = 4; // node 3
+  }
+
 # Trees are your friends
+
+  Entity = FileName
+         | Entity "." Index
+
+  fn foo() { // node "foo.rs".0
+    let x = 3; // node "foo.rs".0.0
+  }
+  fn bar() { // node "foo.rs".1
+    let y = 4; // node "foo.rs".1.0
+  }
+
+  ---
+  Entity = FileName
+         | Entity "." Name [ Index ]
+
+  fn foo() { // node "foo.rs".foo[0]
+    let x = 3; // node "foo.rs".foo[0].expr[0]
+  }
+  fn bar() { // node "foo.rs".bar[0]
+    let y = 4; // node "foo.rs".bar[0].expr[0]
+  }
+
+  ---
+  Entity = FileName
+         | Entity "." Name [ Index ]
+
+  fn foo() {} // node "foo.rs".foo[0]
+  fn foo() {} // node "foo.rs".foo[1]
+
 # Interning
+
+  struct Entity {
+    value: u32
+  }
+  enum EntityData {
+    Root(FileName),
+    Child(Entity),
+  }
+  #[salsa::query_group]
+  trait CompilerData {
+    #[salsa::intern]
+    fn intern_entity(&self, data: EntityData) -> Entity;
+  }
+
 # Tree-based entities also give context
+
+  enum EntityData {
+    Root(FileName),
+    Child(Entity),
+  }
+
 # Signature
+
+  Example from earlier:
+
+      db.signature(entity)
+      db.ast(file_name)
+      db.input_text(file_name)
+
+  How do we get the file_name from the entity?
+
 # Tightening queries with projection
+
+  db.signature(entity) -- signature of a function
+  db.ast(file_name) -- ast of the entire file
+
+  ---
+  db.signature(entity)
+  db.entity_ast(entity) -- extract AST of a single entity
+  db.ast(file_name)
+
 # The "outer spine"
+
+  Question: How do we get "all the errors in the project"?
+
+  db.all_errors()
+  db.filenames() -- get a list of all filenames
+  db.entities(filename) -- for each filename, get all entities
+      db.parse(filename) -- parse file to AST
+  db.type_check(entity) -- for each entity, do type-check
+      db.ast(entity) -- get the AST for this entity
+          db.parse(filename) -- parse file to AST (memoized)
+
+  What if the user edits a comment?
+  Reparse, but that's it.
+
+  What if the user edits a fn body?
+  Reparse the file.
+  Extract the AST.
+  Type-check the function that changed.
+
 # Error handling
+
+  How not to handle an error in a compiler:
+
+  throw new TypeError();
+
+  Another way not to handle errors:
+
+  if (some kind of error) {
+    return fake_but_otherwise_legal_value;
+  }
+
 # Recovery from day one
+
+  Create a sentinel value that means "bad user code here"
+  Invariant:
+      If you see this sentinel value, errors have been reported
+      So you can feel free to suppress downstream errors
+  No such thing as a "fallible" compiler operation
+
 # Example: error type
+
+  enum Type {
+    Integer,
+    Character,
+    Error,
+  }
+
 # Diminishing returns
+
+  struct MethodSignature {
+    argument_types: Vec<Type>,
+    return_type: Type,
+  }
+
+  Hidden assumption here?
+
 # Handling cycles
+
+  Salsa can't handle cycles:
+      currently panics, extending to permit controlled errors
+  If not careful, permitting cycles is an easy way to induce order dependence
+
 # Example: inlining (take 1)
+
+  fn optimized_mir(func_id: FunctionId) {
+    let mut mir = db.unoptimized_mir(func_id);
+    for call_site in mir.call_sites() {
+      let callee_mir = db.optimized_mir(call_site.callee);
+      mir.inline_call(call_site, callee_mir);
+    }
+  }
+
+  fn foo() {
+    bar();
+  }
+  fn bar() {
+    ....
+  }
+
 # Example: inlining (take 2)
+
+  fn optimized_mir(func_id: FunctionId) {
+    let mut mir = db.unoptimized_mir(func_id);
+    for call_site in mir.call_sites() {
+      if let Ok(callee_mir) = db.try_optimized_mir(call_site.callee) {
+        mir.inline_call(call_site, callee_mir);
+      }
+    }
+  }
+
+  Attempt and recover on cycle
+
 # Non-deterministic results
+
+  fn foo() {
+    bar();
+  }
+  fn bar() {
+    foo();
+  }
+
+      If I start from foo, then bar is inlined into foo
+      But if I start from bar, then foo is inlined into bar
+
 # One better approach
+
+  Construct call graph, compute SCCs as one query
+  Process one SCC at a time
+
 # Other cases involving cycles
+
+  From Rust:
+      Name resolution
+      Trait resolution
+  Each has their own specific requirements
+
 # Tracking location information ("spans")
+
+  Various techniques:
+      rustc appends all the input files to one big string
+      stores 32-bit indices into that string
+      compact, but hostile to incremental
+  One alternative:
+      in the AST node, just stores its offset from previous sibling + length
+      in other nodes, track the AST node id
+      recompute the starting offset when needed
+
 # What to put in your AST
+
+  Including whitespace, comments is useful for refactoring
+  Rest of compiler doesn't care
+
 # Incremental re-parsing
+
+  Compiler receives "diffs" to apply to previous inputs
+  Useful to be able to keep old AST trees around
+  If they contain absolute spans or information, they must be rebuilt
+
+
 # Example: swift red and black trees
+
+
 # Alternative: "zooming out" or "zooming in"
+
+  Eliding data is good
+      especially when it can be recovered
+  On-demand system is a good fit for this
+
 # Threading
+
+  Compiler is effectively a server
+  Spawn off threads to handle requests
+
 # Salsa's threading model
+
+  Effectively a read-write lock:
+
+  One master thread that applies edits
+  Any number of "helper threads"
+      while the helper threads are active, attempts to edit will block
+
 # Cancellation
+
+  Threads can check periodically for pending edits
+  Easiest way to recover is to panic and unwind the thread
+
 # Conclusion
 
-\end{Verbatim}
+  Start with an on-demand style
+  Best practices in some areas still need to be codified
+      how to represent ASTs? location information?
+      how to handle cycles?
+
