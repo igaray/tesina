@@ -86,109 +86,73 @@ Requiere:
 
 ## Presentando llbuild
 
+llbuild es un ejemplo de un libreria que provee funcionalidad para construir build systems.
+- open source
+- libreria c++
+- parte de llvm, swift
+- contiene una implementacion de ninja
+
 Objetivos:
-- ignore build description / input language
-  not make a new syntax as a replacement for cmake
-  most build systems, somewhere inside they have a little engine
-  that is capable of evaluating a dependency graph
-  that engine is usually fairly simple
-- with llbuild focus on building a powerful engine
-  - support work being discovered on the fly
-    very few build can support the situation where your executing
-    some task and during the execution of that task you realize you
-    need to do more work
-  - scale to millions of tasks
-    because the goal was to take our existing build and partition
-    them into much smaller pieces to be able to get better
-    incremental beehaviour it really needed to be able to scale
-  - support sophisticated scheduling
-    during a build of llvm we have a lot of cpu boudn stuff running
-    the compipler, and we have a lot of io bound stuff, like runner
-    the linker , which sucks in all the object files
-  - powerful debugging tools
-- support a pluggable task api
+- ignorar el requerimiento de un lenguaje de input/descripcion de build
+  no hacer una sintaxis nueva o reemplazo de cmake
+  la mayoria de los build systems tienen profundo adentro un pequeño motor que es capaz de evaluar un grafo de dependencias, y que usualmente es bastante simple
+- enfocarse en construir un motor poderoso
+  - soporte para descubrir tareas a realizar dinamicamente
+    pocos sistemas de build dan soporte para agregar mas trabajo descubierto durante la ejecucion de una tarea
+  - escalar a millones de tareas
+    dado que el objetivo es tomar el sistema de build actual y particionarlo en tareas mas chicas para obtener mejor comportamiento incremental, lo que realmente se necesita es poder escalar
+  - soportar scheduling de tareas dinamico
+    durante un build de e.g. llvm se tienen muchas tareas cpu-bound, como correr el compilador, y muchas taras io-bound, como correr el linker
+  - soportar un api 'pluggable'
 
 ### llbuild architecture
 
-- flexible underlying core engine
-  the llvm ir equivalent, a common denominator between the high level
-  things, build systems, and the lower level optimization
-  - library for persistent, incremental computation
-  - heavily inspired by a haskell build system called shake
-  - low-level
-    - inputs and outputs are byte strings
-      there are no files, just strings of bytes, and the expectation
-      that as a client, you'll encode data in those if necessary
-    - functions are abstract
-    - use c++ api between tasks
-  - on top of this core: hiher-level build systems are built on the
-    core there's a ninja implementation on top of this, a package
-    manager
+- motor subyacente flexible
+- el equivalente a nivel computacion del IR de LLVM, el cual es un comun denominador entre las cosas de alto nivel, como sistemas de build, y las optimizaciones de mas bajo nivel
+- libreria para computacion incremental y persistente
+- fuertemente inspirado en un sistema de build en haskell llamado shake
+- de bajo nivel:
+  - las entradas y las salidas son secuencias de bytes
+    no hay archivos, solo bytes, y la expectativa que los clientes (de)codificaran sus datos
+  - las funciones son abstractas
+  - c++ como api entre tareas
+- sobre este nucleo se construyen sistemas de build de mas alto nivel (e.g. una implementacion de ninja, un manejador de paquetes)
 
 ### llbuild engine
 
-what would it mean to factor out this kind of more minimal engine
-what it actually looks like
+Como seria este motor del modelo minimal y funcional?
+Cuatro conceptos basicos:
+- claves: un nombre no ambiguo para una computacion que se quiere ejecutar
+- valor: el resultado de una computacion
+- regla: como producir un valor, dado una clave
+- tarea: una instancia ejecutandose de una regla
+  una tarea puede solicitar otras claves de entrada como parte de su trabajo
 
-- minimal, functional model
-  four basic concepts
-  - keys: unambiguos name for some comutation you want to perform
-  - value: the result of a computation
-  - rule: how to produce a value for a key
-  - task: a runing instance of a rule
-    - a task can request other input keys as part of its work
+El nucleo del motor puede ser usado directamente para propositos de computacion general
 
-the core engine can be used directly for general purpose
-computation
+### Ejemplo: ackerman
 
-recursive functions foprma a natural graph each result
-depends on the recursive inputs
+Las funciones recursivas forman un grafo natural, dado que cada resultado depende de entradas recursivas
+Para construir ackerman, codificamos la invocacion de ackerman que queremos ejecutar como una clave, y codificamos el entero resultante como un valor.
+Tomamos esa clave y la mapeamos a una tarea utilizando las reglas, y las tareas mismas implementan la funcion de ackerman.
 
-### example: ackerman
+Se implementa un wrapper struct que envuelve el par de enteros que son los argumentos a la funcion.
+Este struct implementa un par de funciones para convertir a y desde una representacion serializada.
+Asimismo con el valor.
 
-to build ackerman we encode the ackerman invocation we want
-to make as a key, we encode the integer result as a value,
-then we take those keys and we map them to tasks using our
-rules, and then the tasks themselves implement the ackerman
-function
+La forma de implementar las reglas en llbuild es con un delegate.
+El motor de llbuild puede soportar esta idea de trabajo siendo generado dinamicamente porque le pasas un delegate, que es una funcion que provee las reglas que necesita cuando la invoca.
+De esta manera, a diferencia de un makefile o ninja  file, en el cual todas las reglas estarian presentes de antemano, desde el punto de vista del motor solo tiene una funcion que invoca a medida que van entrando las tareas.
 
-we have simple wrapper struct that wraps the integer pair
-that the arguments,
+En este caso, la funcion sencillamente decodifica la clave y crea una tarea.
+Tambien se encarga de deteccion de ciclos.
 
-it has a couple functions to convert it to and from a
-serialized representation the value is the same thing
+Asi, las tareas es donde realmente se ejecuta el trabajo.
+El motor invoca metodos de las tareas a medida que se realiza el trabajo del build.
 
-where it gets more interesting with rules
-
-the way llbuild works is you give it a delegate,
-
-it can handle this idea of work being generated on the fly,
-and the reason it can do it is you jhust give it a delegate,
-and you give it a function that provides it rules when it
-wants them
-
-so unlike a ninja file where all of the rules are present in
-advance, from the engines perspective it just has a function
-to request rules as they come in
-
-so in this case our function just decodes that key and will
-create a task if its requested
-
-it has some other stuff like it can report to you if it
-found a cycle
-
-so tasks are where the real work happens
-
-the way that the tasks work is that the engine will call
-back into your tasks as interesting stuff happens happens
-
-when a task is started, youre notified
-
-when the engine has computed a result you asked for, then
-its given to you
-
-when all of the inputs that your task has asked for have
-been computed, then it shluld complete
+Cuando se comienza una tarea, se recibe una notificacion.
+Cuando el motor ha computado un resultado que se solicito, se lo devuelve al codigo que lo solicito.
+Cuando todas las entradas que tu tarea solicito han sido computados, entonces completa la tarea inicial y termina.
 
 ## Una arquitectura nueva
 
@@ -197,21 +161,9 @@ Requiere:
 - un sistema de build extensible
 - un sistema de plugins de compilador
 
-## What's the status of this 2 years later?
+## Estado actual de llbuild
 
-Funny you should ask! llbuild is alive and strong, and now
-powers the default build system used in Xcode 10. Getting
-the "new architecture" proposed here off the ground has
-continued to be difficult, mostly due to the challenge of
-refactoring the existing compilers, and that the payoffs
-only start to get realized once a large amount of work has
-been done. It is hard to unwind 40 years of CS-precedent for
-how compilers are built overnight, but I am still optimistic
-about the potential here!
-
-... and probably worth adding: since this was published
-llbuild's own Ninja implementation usually outperforms the
-actual Ninja on most real world situations we've seen (such
-as building LLVM/Clang on a variety of different hardware).
-
-\end{Verbatim}
+llbuild es el motor del sistema de build de XCode 10.
+Pasar a "la nueva arquitectura" sigue siendo dificil, principalmente por la dificultad de refactorear compiladores existentes, y los beneficios se empiezan a ver recien cuando la mayor parte del trabajo se ha hecho.
+Es dificil deshacer 40 años de precedente de un dia para el otro.
+Desde su publicacion, la implementacion de ninja basada en llbuild tiene mejor performance en la mayoria de las situaciones de mundo real (e.g. build de clang/llvm en variedad de hardware distinto).
