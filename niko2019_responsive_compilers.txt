@@ -171,7 +171,7 @@
          // auto-completion here?
   }
 
-  # strict phase separation is impossible anyway
+# strict phase separation is impossible anyway
 
   the other reason that led us in this direction, is that in
   most compiler that I've worked on , if you have a strict
@@ -563,24 +563,24 @@
   db.ast(..) -- changed in R1 ← out of date
   db.input_text(..) -- changed in R2
 
-the basic idea, the simplest idea would be something like this
-when you invoke a given query you can check if its out of scope, otherwise you can walk those dependencies and see check if any of them have changed, what did they transitively depend on, has it changed since the last revision, and if so re execute
+  the basic idea, the simplest idea would be something like this
+  when you invoke a given query you can check if its out of scope, otherwise you can walk those dependencies and see check if any of them have changed, what did they transitively depend on, has it changed since the last revision, and if so re execute
 
-this is kind of like what make does if you think about it
-if you think about make it has this dependency graph that it figures out
-then if some file if the timestamp is newer it's going to invalidate eagerly everything reachable from that function and recompute it or from that file and
-recompute, re execute the compiler
+  this is kind of like what make does if you think about it
+  if you think about make it has this dependency graph that it figures out
+  then if some file if the timestamp is newer it's going to invalidate eagerly everything reachable from that function and recompute it or from that file and
+  recompute, re execute the compiler
 
-and this that's what what you would effectively get if you did it this way
+  and this that's what what you would effectively get if you did it this way
 
-this is again something we tried the first time in our first version that never made it out and we'll see that it has some subproblems but it basically works
+  this is again something we tried the first time in our first version that never made it out and we'll see that it has some subproblems but it basically works
 
-so can kind of give you an example of what might will happen here
+  so can kind of give you an example of what might will happen here
 
-if you are computing the signature of something and you're in revision one
-let's say to compute the signature of a function
-what we would have to figure out first
-we have to go in and invoke DB.ast and that's going to give us the ast for the function and then when we have the ast
+  if you are computing the signature of something and you're in revision one
+  let's say to compute the signature of a function
+  what we would have to figure out first
+  we have to go in and invoke DB.ast and that's going to give us the ast for the function and then when we have the ast
 
 well to get the AST that
 how do we get the AST

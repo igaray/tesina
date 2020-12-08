@@ -281,14 +281,14 @@ El seguimiento, o \textit{tracking}, de dependencias, es provista por librerias 
 Estas librerias proveen parte de la funcionalidad necesaria para crear compiladores basados en queries.
 
 Rock es una libreria experimental fuertemente inspirada por Shake y el paper \textit{Build systems à la carte} \cite{mokhov2018build}.
-Esencialmente implementa un framework de sistema de construccion \textit{build system framework}, como \texttt{make}.
-Los sistemas de construccion tienen mucho en comun con compiladores modernos dado que tambien queremos que sean incrementales, i.e. que aprovechen los resultados de construcciones anteriores al construir uno nuevo con pocos cambios.
-Sin embargo, tambien tienen una diferencia: a la mayoria de los sistemas de construccion no les importa el tipo de sus queries dado que trabajan sobre archivos y sistema de archivos.
+Esencialmente implementa un framework de sistema de build \textit{build system framework}, como \texttt{make}.
+Los sistemas de build tienen mucho en comun con compiladores modernos dado que tambien queremos que sean incrementales, i.e. que aprovechen los resultados de builds anteriores al construir uno nuevo con pocos cambios.
+Sin embargo, tambien tienen una diferencia: a la mayoria de los sistemas de build no les importa el tipo de sus queries dado que trabajan sobre archivos y sistema de archivos.
 El esquema detallado en \textit{Build systems à la carte} se aproxima mejor a lo necesario en el caso de un compilador.
 En esta publicacion detallan un sistema en el cual el usuario escribe un conjunto de computaciones, tareas, que toman una clave y retornan un valor, y elige un tipo adecuado para las claves y otro para los valores.
-Las tareas se formulan asumiendo que van a ser ejecutadas en un entorno en el cual existe una funcion \texttt{fetch} de tipo \texttt{Key -> Task[Value]}, donde \texttt{Task} es un tipo que describe las reglas del sistema de construccion, la cuale puede ser usada para obtener los valores de una dependencia con una clave dada.
-El sistema de construccion tiene control sobre que codigo corre al momento de ejecutar \texttt{fetch}, de tal manera que se puede variar la granularidad del seguimiento de dependencias, memoisacion, y actualizaciones incrementales.
-\textit{Build systems à la carte} tambien explora que tipo de sistemas de construccion obtenemos cuando variamos lo que puede realizar una tarea \textit{Task}, e.g. si es una monada o un aplicativo.
+Las tareas se formulan asumiendo que van a ser ejecutadas en un entorno en el cual existe una funcion \texttt{fetch} de tipo \texttt{Key -> Task[Value]}, donde \texttt{Task} es un tipo que describe las reglas del sistema de build, la cuale puede ser usada para obtener los valores de una dependencia con una clave dada.
+El sistema de build tiene control sobre que codigo corre al momento de ejecutar \texttt{fetch}, de tal manera que se puede variar la granularidad del seguimiento de dependencias, memoisacion, y actualizaciones incrementales.
+\textit{Build systems à la carte} tambien explora que tipo de sistemas de build obtenemos cuando variamos lo que puede realizar una tarea \textit{Task}, e.g. si es una monada o un aplicativo.
 Un problema que surge inmediatamente es que no hay ningun tipo satisfactorio para \texttt{Value}.
 E.g. puede haber una query para obtener el modulo donde esta definido un tipo, y otra para obtener la representacion del tipo dado el nombre calificado de un tipo.
 \cite{olle_query_based}
@@ -363,7 +363,7 @@ E.g. puede haber una query para obtener el modulo donde esta definido un tipo, y
 \section*{Verifying dependencies and reusing state [Olle20]}
 
 Una funcionalidad que se puede incorporar a las funciones regla son las actualizaciones incrementales.
-Cuando se utiliza, el sistema de construccion mantiene un registro en una tabla de cuales dependencias uso una tarea al ejecutarse, i.e. cuales claves busco y cuales fueron sus valores asociados.
+Cuando se utiliza, el sistema de build mantiene un registro en una tabla de cuales dependencias uso una tarea al ejecutarse, i.e. cuales claves busco y cuales fueron sus valores asociados.
 Usando esta informacion es posible determinar cuando es seguro reutilizar el cache de una corrida previa del compilador aunque haya habido cambios en otras partes del grafo de dependencias.
 Este seguimiento de grano fino de las dependencias tambien permite reutilizar el cache cuando la dependencia de una tarea cambia de tal manera que el cambio no tiene efecto.
 E.g. cambios en el espaciado pueden disparar un reparseo, pero dado que el AST permanece igual, los valores del AST cacheados pueden ser reutilizados en queries que dependan de ese resultado de parseo.
@@ -485,7 +485,7 @@ Se puede definir mas de un grupo para separar las queries en componentes.
 \addcontentsline{toc}{chapter}{Conclusiones}
 \chapter*{Conclusiones}
 
-La mayoria de los lenguajes modernos necesitan tener una estrategia en cuanto a la provision de herramientas de desarrollo, y la construccion de compiladores en base a sistemas de queries parace ser un acercamiento con mucha promesa.
+La mayoria de los lenguajes modernos necesitan tener una estrategia en cuanto a la provision de herramientas de desarrollo, y el build de compiladores en base a sistemas de queries parace ser un acercamiento con mucha promesa.
 Con queries el desarrollador del compilador no necesita manejar explicitamente la actualizacion e invalidacion de un conjunto de caches ad hoc, lo cual puede ser el resultado cuando se agregan actualizaciones incrementales a una arquitectura de compilador tradicional en pipeline.
 En un sistema basado en queries se maneja el estado incremental de manera centralizada, reduciendo la posibilidad de errores.
 Las queries son excelentes para las herramientas porque permiten pedir por el valor de cualquier query en cualquier momento sin tener que preocuparse sobre el orden o efectos temporales, al igual que con un Makefile bien escrito.
