@@ -4,11 +4,6 @@ Sept. 8, 2016 · Michael Woerister
 
 Introduction
 
-    I remember when, during the 1.0 anniversary presentation at the Bay Area Meetup, Aaron Turon talked about Dropbox so far having been pretty happy with using Rust in production there.
-    The core team has been in touch with them regularly, he said, asking them, you know, what do you need? And their answer is always: faster compiles ...
-    Improving compile times has actually been a major development focus after Rust reached 1.0 -- although, up to this point, much of the work towards this goal has gone into laying architectural foundations within the compiler and we are only slowly beginning to see actual results.
-    One of the projects that is building on these foundations, and that should help improve compile times a lot for typical workflows, is incremental compilation.
-    Incremental compilation avoids redoing work when you recompile a crate, which will ultimately lead to a much faster edit-compile-debug cycle.
 
 Why Incremental Compilation in the First Place?
 
@@ -62,62 +57,47 @@ Dependency Graphs
 
 Dependency Tracking in the Compiler
 
-    When compiling in incremental mode, we always build the dependency graph of the produced data: every time, some piece of data is written (like an object file), we record which other pieces of data we are accessing while doing so.
-
-    The emphasis is on recording here. At any point in time the compiler keeps track of which piece of data it is currently working on (it does so in the background in thread-local memory). This is the currently active node of the dependency graph. Conversely, the data that needs to be read to compute the value of the active node is also tracked: it usually already resides in some kind container (e.g. a hash table) that requires invoking a lookup method to access a specific entry. We make good use of this fact by making these lookup methods transparently create edges in the dependency graph: whenever an entry is accessed, we know that it is being read and we know what it is being read for (the currently active node). This gives us both ends of the dependency edge and we can simply add it to the graph. At the end of the compilation sessions we have all our data nicely linked up, mostly automatically:
+    Al compilar en modo incremental, siempre se construye el grafo de dependencia de los datos producidos: cada vez que se escribe un dato (como un archivo objeto), se registra cuales otros datoa se acceden en el proceso.
+    Se hace enfasis en el registro. En todo momento el compilador mantiene el registro de sobre cual dato esta trabajando (esto lo hace en background en memoria local al thread).
+    Este es el nodo actualmente activo del grafo de dependencias.
+    Por otro lado, el dato que necesita ser leido para computar el valor del nodo actual tambien se registra: usualmente ya reside en algun tipo de contenedor (e.g. una tabla hash) que requiere invocar un metodo de lookup para acceder a una entrada especifica.
+    Se hace uso de este hecho, haciendo que los metodos de lookup crean los arcos del grafo de dependencia, y sencillamente se agregan al grafo.
+    Al final de las sesiones de compilacion se tienen todos los nodos enlazados, automaticamente.
 
     FIGURE Dependency Graph of Compilation Data
 
-    This dependency graph is then stored in the incremental compilation cache directory along with the cache entries it describes.
-
-    At the beginning of a subsequent compilation session, we detect which inputs (=AST nodes) have changed by comparing them to the previous version. Given the graph and the set of changed inputs, we can easily find all cache entries that are not up-to-date anymore and just remove them from the cache:
+    Este grafo de dependencia se almacena en un directorio de cache de compilacion incremental, junto con las entradas que el cache describe.
+    Al comienzo de una sesion de compilacion siguiente, se detecta cuales entradas (i.e. nodos del AST) han cambiado, comparandolas con sus versiones previas.
+    Dado el grafo y el conjunto de entradas que cambiaron, se puede facilmente encontrar todas las entradas en el cache que no estan actualizadas y eliminarlas del cache.
+    Cualquier elemento que sobrevivio esta fase de validacion de cache puede ser re-utilizado durante la sesion de compilacion actual.
 
     FIGURE Using the Dependency Graph to Validate the Incremental Compilation Cache
 
-    Anything that has survived this cache validation phase can safely be re-used during the current compilation session.
-
     There are a few benefits to the automated dependency tracking approach we are employing. Since it is built into the compiler's internal APIs, it will stay up-to-date with changes to the compiler, and it is hard to accidentally forget about. And if one still forgets using it correctly (e.g. by not declaring the correct active node in some place) then the result is an overly conservative, but still "correct" dependency graph: It will negatively impact the re-use ratio but it will not lead to incorrectly re-using some outdated piece of data.
 
-    Another aspect is that the system does not try to predict or compute what the dependency graph is going to look like, it just keeps track. A large part of our (yet to be written) regression tests, on the other hand, will give a description of what the dependency graph for a given program ought to look like. This makes sure that the actual graph and the reference graph are arrived at via different methods, reducing the risk that both the compiler and the test case agree on the same, yet wrong, value.
+    Tambien es de notar que el sistema no intenta predecir o computar como sera el grafo de dependencia.
+    Una gran parte de las pruebas de regresion, sin embargo, si tendran una descripcion de como deberia ser el grafo de dependencia para un programa dado.
+    Esto asegura que el grafo efectivo y el grafo de referencia se construyen por distintos metodos, reduciendo el riesgo de que tanto el compilador y el test esten de acuerdo en un valor incorrecto.
 
-"Faster! Up to 15% or More."*
+    Algunas implicaciones:
+    El grafo de dependencia refleja las dependencias efectivas entre partes del codigo fuente y partes del binario emitido.
+    Si existe un nodo de entrada que es alcanzable de muchos nodos intermedios, e.g. un tipo de dato central que es utilizado en casi toda funcion, entonces cambiar la definicion de ese tipo de dato causara que casi todo debe ser compilado de cero.
 
-    Let's take a look at some of the implications of what we've learned so far:
+    En otras palabras, la efectividad de la compilacion incremental es muy sensible a la estructura del programa siendo recompilado y al cambio realizado.
+    Cambiar un unico caracter del codigo fuente podria invalidar completamente el cache de compilacion incremental.
+    Sin embargo, este tipo de cambio es un caso raro y la mayor parte del tiempo solo una pequeña porcion del programa debe ser recompilado.
 
-        The dependency graph reflects the actual dependencies between parts of the source code and parts of the output binary.
-        If there is some input node that is reachable from many intermediate results, e.g. a central data type that is used in almost every function, then changing the definition of that data type will mean that everything has to be compiled from scratch, there's no way around it.
+The Current Status of the Implementation
 
-    In other words, the effectiveness of incremental compilation is very sensitive to the structure of the program being compiled and the change being made. Changing a single character in the source code might very well invalidate the whole incremental compilation cache. Usually though, this kind of change is a rare case and most of the time only a small portion of the program has to be recompiled.
-
-    The Current Status of the Implementation
-
-    For the first spike implementation of incremental compilation, what we call the alpha version now, we chose to focus on caching object files. Why did we do that? Let's take a look at the compilation phases again and especially at how much time is spent in each one on average:
-
-    Relative Cost of Compilation Phases
-
-    As you can see, the Rust compiler spends most of its time in the optimization and codegen passes. Consequently, if this phase can be skipped at least for part of a code base, this is where the biggest impact on compile times can be achieved.
-
-    With that in mind, we can also give an upper bound on how much time this initial version of incremental compilation can save: If the compiler spends X seconds optimizing when compiling your crate, then incremental compilation will reduce compile times at most by those X seconds.
-
-    Another area that has a large influence on the actual effectiveness of the alpha version is dependency tracking granularity: It's up to us how fine-grained we make our dependency graphs, and the current implementation makes it rather coarse in places. For example, the dependency graph only knows a single node for all methods in an impl. As a consequence, the compiler will consider all methods of that impl as changed if just one of them is changed. This of course will mean that more code will be re-compiled than is strictly necessary.
-
-Performance Numbers
-
-    Here are some numbers of how the current implementation fares in various situations. First let's take a look at the best case scenario where a 100% of a crate's object files can be re-used. This might occur when changing one crate in a multi-crate project and downstream crates need to be rebuilt but are not really affected.
-
-    Normalized Incremental Compilation Build Times
-
-    As you can see, compiling a crate for the first time in incremental mode can be slower than compiling it in non-incremental mode. This is because the dependency tracking incurs some additional cost when activated. Note that compiling incrementally can also be faster (as in the case of the regex crate). This is because incremental compilation splits the code into smaller optimization units than a regular compilation session, resulting in less time optimizing, but also in less efficient runtime code.
-
-    The last column shows the amount of time a rebuild of the crate takes when nothing has actually changed. For crates where the compiler spends a lot of time optimizing, like syntex-syntax or regex, the gain can be substantial: The incremental rebuild only takes about 22% of the time a full rebuild would need for syntex-syntax, only 16% for regex, and less than 10% for the all.rs test case of the futures-rs crate.
-
-    On the other hand, for a crate like the futures-rs library that results in little machine code when being compiled, the current version of incremental compilation makes little difference: It's only 3% faster than compiling from scratch.
-
-    The next graph shows which impact various changes made to the regex crate have on incremental rebuild times:
-
-    Build Times After Specific Changes
-
-    The numbers show that the effectiveness of incremental compilation indeed depends a lot on the type of change applied to the code. For changes with very local effect we can get close to optimal re-use (as in the case of Error::cause(), or dfa::write_vari32()). If we change something that has an impact on many places, like Compiler::new(), we might not see a noticeable reduction in compile times. But again, be aware that these measurements are from the current state of the implementation. They do not reflect the full potential of the feature.
+    El estado actual de rustc a fines de 2019.
+    Para la primera implementacion de compilacion incremental, implementada a principios de 2019, el equipo de rustc de focalizo en cachear archivos objeto.
+    Consequentemente, si esta fase se puede saltear aunque sea para parte de un codigo, se puede lograr el mayor impacto en tiempos de compilacion.
+    Con esto en mente, tambien se puede estimar la cota superior de cuanto tiempo se puede ahorrar: si el compilador pasa N segundos optimizando cuando compila un crate, entonces la compilacion incremental puede reducir los tiempos de compilado en a lo sumo esos N segundos.
+    Otra area que tiene una gran influencia en la efectividad de la primera implementacion de es la granularidad del seguimiento de dependencias.
+    Depende de la implementacion cuan fina es la granularidad de los grafos de dependencias, y la implementacion actual es media gruesa.
+    Por ejemplo, el grafo de dependencias solo tiene un unico nodo para todos los metodos en un \texttt{impl} (bloque de implementacion de un trait).
+    En consecuencia, el compilador considerara que cambiaron todos los metodos de ese \texttt{impl} aunque solo haya cambiado uno solo.
+    Esto por supuesto significa que mas codigo sera recompilado de lo que seria estrictamente necesario.
 
 Future Plans
 
