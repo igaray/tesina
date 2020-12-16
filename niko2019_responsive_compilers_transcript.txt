@@ -1,0 +1,1287 @@
+
+  we have an example here where there's a
+  function a that invokes a function B and
+  then conditionally invokes either C or D
+  depending on the result if B is true
+  then our list of dependencies in the
+  first revision might be sort of a
+  invoked B and invoked C because be worse
+  true but in the second revision if we
+  find out that B has changed we know what
+  we don't want to do is go check if C is
+  up-to-date before we've checked B right
+  because it may be that C should never
+  have been invoked in the first place
+  right if B has already changed we just
+  have to stop and we execute the function
+  because it could go through some other
+  path so you just have you have to keep
+  that in mind and the second part is that
+  or you can I didn't say this explicitly
+  but we also track us sort of we don't
+  just check when did it last changed but
+  we track when did we last check if it is
+  when did we last update and check this
+  value that basically ensures that we
+  never recompute something more than once
+  in a given revision so you know that at
+  any point it's kind of linear over the
+  set of things and finally we you do have
+  to worry about garbage collection
+  because if you think back to this ABC
+  example like the first round the
+  function a wound up invoking the
+  function C and we memorize that but if
+  in some later execution that function
+  may never get invoked and we still have
+  this memorized value kind of hanging
+  around that we might want to because
+  we're thinking maybe we'll want to reuse
+  it later so that that requires you to
+  collect these old results at some point
+  and it turns out you can do this in a
+  kind of nice way because we're already
+  tracking for all the memorized values
+  the revision when we last computed them
+  when they were last checked if they were
+  up-to-date or not and so essentially
+  what you can do is
+  you do some sort of let's say your
+  master query whatever it is like type
+  check all the functions and then at the
+  end of that you can just sweep through
+  the memo ice values and say did that
+  wind up being recomputed in the most
+  recent revision or not and if it didn't
+  then you know it's something that's no
+  longer needed or at least was not needed
+  to do that master query and you can
+  throw it away and the nice part of this
+  of course is these are all you know
+  fully functional pure things that were
+  derived so at the end of the day if you
+  throw something away that you might want
+  later it doesn't really matter because
+  you can always recompute it and in fact
+  we've been finding more and more that
+  you know computation is cheap sometimes
+  it's better to just throw away
+  everything even if you know you're going
+  to need it later because you might as
+  well we compute it so that's an
+  interesting point of like let's say a
+  place where we have been playing around
+  with what the right strategy is but so
+  when you're done you kind of get this
+  picture where you have a graph of
+  computation and what you really want to
+  do is we execute the early steps but but
+  cut it off as quickly as you can right
+  so when you're doing this approach one
+  of the things you have to do is separate
+  out you know you don't want to have all
+  the thing all the different bits of data
+  that you're going to compute all
+  packaged together into one data
+  structure
+  so I mentioned entity component systems
+  and so on earlier that's really relevant
+  here because let's say you have a parser
+  that produces an ast and a lot of
+  compilers you might have like a class
+  for the ast node and in that ast node it
+  would have oh when I named resolve this
+  what did I resolve it to what is the
+  type of this ast node sort of all stored
+  as fields in the ast itself but if you
+  do that in this incremental system that
+  won't work so well because when we
+  reparse the ast we of course don't have
+  those values anymore and you you'd have
+  to sort of port them you just can't
+  combine it basically you can't reuse mix
+  and match bits of data from different
+  revisions that way so what we do instead
+  is to sort of separate out the layer
+  and you wind up with essentially a lot
+  of maps that's what it comes down to so
+  you could imagine for example that if
+  you have the ast for a given function
+  you can give each node in the ast and ID
+  right map just an integer and then you
+  can produce for name resolution you can
+  have a map that says for the node with
+  this ID here's the here's what I
+  resolved it - here's the symbol or
+  entity and for type checking you might
+  have a similar map it says here's the
+  type for that ASD alright and this works
+  pretty well it's pretty it's reasonably
+  efficient but there it turns out that
+  the way that you give these IDs actually
+  matters a lot - and that was something
+  it's like a trick that keeps coming up
+  and in the old rust compiler the
+  old-west compiler before we made it
+  incremental also used a lot of maps
+  that's because it was written in a very
+  functional style so it didn't want to be
+  mutating things but it assigned the node
+  IDs in a very simple way it just did a
+  walk of the entire ast for your whole
+  program and gave them numbers you know
+  pre index of this walk so 0 1 2 3 this
+  had a sort of downside which is it was
+  very simple but if I modify it let's say
+  the function foo and add some more stuff
+  into it then all the IDs for the
+  function bar are going to be different
+  after that so that there's this
+  contamination and that obviously won't
+  work with an incremental system or at
+  least if you edit things early in the
+  file you'll have to do a lot of work
+  recomputing stuff later on in the file
+  and that's probably not what you wanted
+  so the the basic trick here is to use
+  trees and this is one of those tricks
+  where I feel like as we do the design we
+  just keep coming across this this being
+  a useful technique so what you do is
+  instead of giving instead of your ID
+  being just a simple integer it's some
+  kind of path right and this path it can
+  be just in it it can just be indexes or
+  it can be something richer with names it
+  doesn't matter that much but so this
+  would be the simplest
+  simple scheme you might start it you
+  might say the first step is a file name
+  and then every that that's the base kind
+  of entity that can be in your system is
+  a whole file but then within that you
+  can sort of nest right so the function
+  foo might be like represented as dot 0
+  and dot 1 would be the function bar and
+  then within there we have further
+  numbers right and now of course we have
+  the advantage that changing the contents
+  of food doesn't affect the numbers of
+  bar in any way and what we actually do
+  in the compiler is like a little bit
+  different so the main downside of this
+  of this index scheme is if I add a new
+  function like if I put a function in
+  between foo and bar now the the index of
+  bar has changed and so we'd have to
+  recompute things about bar and maybe
+  that's a problem maybe it's not like I
+  said it turns out you know the computer
+  is pretty fast like that might not be
+  actually that big a deal but if you
+  wanted to avoid it you can use names
+  right and then and now oh like as long
+  as we insert a new function in between
+  as long as it has a different name it's
+  ok
+  the problem with names of course is then
+  you have to deal with incorrect programs
+  and or you might have two things with
+  the same name which might or might not
+  be correct but you have to deal with
+  that possibility so we actually use in
+  the compilers we have this extra index
+  so we use names but we give them an
+  index and then when the same name
+  appears more than once we increment the
+  index and that's usually actually an
+  error but we still need to keep going so
+  that we can give you feedback but it
+  lets us sort of have a unique ID and
+  sometimes it's not an error because
+  there are certain things that are
+  anonymous for example that that works
+  pretty well in practice yeah I don't
+  know what I was oh ok forget that so you
+  have these big trees and that that's
+  great but you have to actually pass them
+  around and so forth and if you had like
+  a garbage collected language I guess
+  that's not such a big deal you can sort
+  of allocate them but you probably do
+  wind up creating a lot of the same tree
+  over and over so what we do is we have
+  also the last piece of this system is a
+  kind of interning mechanism
+  it's basically there to handle to turn
+  these big trees into little integers and
+  go back and forth right and so you can
+  reference this integer you you basically
+  in turn the way you'd represented in in
+  rust is that the whole path is
+  represented as an integer a new typed
+  integer so it has a struct that wraps it
+  around it so that we can give it a
+  meaningful type and then this is the
+  actual data which is recursive but it
+  goes through the interning system right
+  so the recursive step references the
+  previously interned value and then we
+  have a special interning mechanism that
+  can convert the data into a new one and
+  we can actually track those dependencies
+  too and thus if for example some
+  function is renamed or parts of the
+  system are different we'll we'll figure
+  it out but the other advantage of this
+  this entity based approach or this this
+  tree based identify our approach is that
+  you get some context because it turns
+  out you you often really need this kind
+  of context so if you think about some of
+  the examples I gave earlier when you're
+  computing the signature of a given
+  entity I sort of said I think I
+  hand-woven and said something like to
+  compute the signature of a function we
+  have to look at the ast of that function
+  but then I said that the ast is there's
+  only one ast per file we kind of talked
+  about this and the question would be how
+  do I get from this function to that file
+  how do I know what file the function is
+  in right in the first place and there
+  are different ways to do it but one way
+  that works really well if you have this
+  tree based approach is that it's it's
+  right there in the identifier basically
+  you can walk up the ID and find the root
+  of it is some file and you can you can
+  get the file from there so the the other
+  big technique that comes up a lot is the
+  ability to tighten your queries right so
+  so far what we have basically we have
+  this this the system that lets you write
+  a bunch of queries it tracks then or
+  depend
+  the nice part about is it's guaranteed
+  to sort of be correct
+  it'll only recompute or it will always
+  give you a refreshed value but it might
+  actually do a lot of recomputation if
+  your queries are very broad all right
+  and this particular query setup that I
+  showed here is an example where it might
+  be too broad in practice you have to try
+  it and see because that's what you're
+  gonna find wind up doing here is
+  recomputing the signature of the
+  function whenever anything in the file
+  changes because this ast is for the
+  entire file and that's maybe that's okay
+  or maybe it's not alright and what what
+  you can do if you find that your
+  recomputing something too often is you
+  can insert a sort of intermediate query
+  to do a projection or a narrowing or
+  some sort of transformation all right so
+  maybe I have a query that says give me
+  the ast just for this one function and
+  all that does is find the function and
+  pull it out from the bigger ast but the
+  advantage of this is that if the bigger
+  ast changes all I have to re-execute is
+  the code that finds and extracts the one
+  smaller piece of AST and I won't have to
+  do any of the dependent operations so
+  that that kind of is basically just a
+  handy thing where you can do while
+  you're looking while you're optimizing
+  I don't know there's a lot probably not
+  thousands it's probably more that's
+  probably hundreds but we're sort of I
+  think we have more yeah it's definitely
+  hundreds one of the things the rust
+  compiler is actually using a slightly
+  different version of this system so this
+  is like an idealized version of the rest
+  compiler that has been extracted to a
+  library and we are actually using it we
+  have us there's a separate effort to
+  build an IDE like an IDE first compiler
+  for rust that we have to figure out how
+  to bridge the two that's another story
+  but that is using this framework and I'm
+  not sure how many queries they have but
+  they're not complete yet the rust
+  framework is using a slightly different
+  one but in any case I think it's has on
+  the order of hundreds but the reason I
+  mentioned that we're not using it is one
+  of the problems we had in the rest
+  compiler is that we didn't support any
+  kind of modules and the number of
+  queries did indeed grow very large and
+  it's just annoying if nothing else but
+  also hard to read the source because
+  they're all in like one huge list and so
+  this system part of the reason that
+  everything is by interfaces and so on is
+  exactly so that you can modularize the
+  queries and say here's the stuff for the
+  parser and here's the type checker and
+  they depend on one another and so on but
+  it does it does grow quite large I would
+  say so one of the questions I think what
+  when I've been working with this system
+  it seems very clear when you look at any
+  individual function how it's supposed to
+  work and it's kind of clear when you
+  think about at the outer level okay I'm
+  gonna make a query like get me the
+  completions but getting from give me the
+  completions at this point to those
+  intermediate queries that actually know
+  what entities there are and can think
+  about the type checking and all that
+  stuff it's kind of challenging it's like
+  a quantum mechanics thing or something
+  it all makes sense at the two extremes
+  but the middle is confusing so I thought
+  it would be useful to just sort of walk
+  over this this spine how it all connects
+  this is an example how you might do it
+  so if you were say computing what are
+  all the errors in the project that's
+  that's like that's kind of a query you
+  would likely have for your IDE you might
+  start by saying give me all the file
+  names in the project right and that's
+  probably just a base input and then then
+  you can kind of iterate over each file
+  and have something that says give me all
+  the entities which would go through
+  which would have to parse them parse the
+  ast and then walk the ast and extract
+  just the IDS and return them to you all
+  right and then you can walk through and
+  type check all the entities and by this
+  point once you're in this this round of
+  like getting the ast for a given entity
+  and so on and it becomes again fairly
+  clear this is like your standard code
+  because now you have the identify as you
+  need for all the things but the I left
+  out some steps here for sure like type
+  checking would probably have to get the
+  ast but it would also need to get the
+  name resolution results and things like
+  that but they fit into this framework
+  all right and so having this now we can
+  sort of walk through and see well what
+  happens in this complete picture if the
+  user edits a comment all right like I
+  showed and the answer might be as simple
+  as well we've done one revision so we
+  have all this mo eyes data let's say and
+  if the user edits a comment we can
+  ReWalk it and we see that we have to
+  rerun the parser but once we rerun the
+  parser the ast that results is the same
+  so we just stop right and we can keep
+  all the type checks intact but if the
+  user edits a single function body then
+  we would have to rerun the parser they
+  would not be the same because they did
+  actually edit a function body so the ast
+  is different so in that case we would
+  have to as we're doing the type checking
+  for for each we would extract out one by
+  one what is the AST for any given
+  function and we'll find that only one of
+  them has changed so we'll wind up we
+  running the type checker but just for
+  that one function right and so we wind
+  up we doing a pretty reasonably minimal
+  amount of work
+  overall now you meant there was a
+  question of how many queries there are
+  in the compiler and I mentioned memory
+  use so one of the things I would add is
+  that in practice you you may not
+  actually want to keep all of this
+  memorized data around for all of your
+  queries because it can be quite a large
+  graph but there's a lot of different
+  tricks you can do so one of the things
+  we do and the compiler is we only keep
+  the hash actually we don't keep the full
+  value so we can still re-execute and we
+  can still see if it has changed because
+  it's a cryptographic hash so it's at
+  least as good as sha-1 or whatever and
+  we know if it's changed but if we have
+  to recompute it then we'll just redo the
+  work because it's not worth not worth it
+  we only keep the values we sort of
+  selectively keep what what data to keep
+  and what not to keep and that kind of
+  tuning is I think an inch it's sort of
+  annoying that it's necessary but if you
+  have this framework it's or have a
+  framework it's nice that you can you can
+  do it relatively easily so now I want to
+  talk about a few other sort of things
+  that happen in practice one of them is
+  error handling
+  so I mentioned somewhere along the line
+  that we if you have errors you you know
+  you might like to
+  I'll give you have two functions with
+  the same name we want to have to handle
+  that case and I think that in general
+  especially if you're in an IDE context
+  you really want to be handling you
+  really don't want to stop compilation
+  basically ever right and a lot of early
+  compilers I think will basically handle
+  an error by just saying well okay
+  something's wrong I give up I'm done and
+  that's that's a reasonably easy approach
+  it's probably okay for for many projects
+  but it's actually but it's it's really
+  difficult to sort of recover once you've
+  baked this strategy into your compiler
+  it's much hard to get it out again and
+  the russ compiler had this strategy for
+  sure for awhile and we've been slowly
+  getting rid of it and it's been very
+  difficult right and what you can do
+  instead that's actually not a lot harder
+  and and much nicer or sorry me before I
+  get to what you can do instead the next
+  thing that I think you people often try
+  to do which the Russ compiler also tries
+  to do is to say well there's an error
+  I'll report the error and then I'm gonna
+  give back some value that's like
+  reasonable it has the right type but
+  like for the compilers type but it's not
+  the right value so it might be like I
+  need to compute the type of this
+  expression this expression is bogus I'll
+  just give back the type integer and say
+  yeah good enough like then and maybe
+  they'll get some other errors down the
+  line but the user can figure it out and
+  that kind of works sometimes but it does
+  lead to some really confusing errors to
+  a user where suddenly the compiler is
+  like talking about the type integer and
+  you have no idea why right so a better
+  idea is to introduce some kind of
+  Sentinel values that say this is bogus
+  basically this is an erroneous
+  expression a bad parse whatever and then
+  you can just return this value and it's
+  not that much more work because as long
+  as you just have them there then it's
+  like almost as easy as throwing to just
+  return this this sentinel value and then
+  they're usually very easy to propagate
+  because you know by that if you ever see
+  that sentinel value and you know that an
+  error has been reported so you can just
+  kind of short-circuit all the other
+  computation and just keep propagating
+  bigger and bigger sentinels up the line
+  and so you wind up with a notion where
+  basically compilers there is no such
+  thing as a fallible operation it always
+  succeeds but it might produce an error
+  value and this invariant is pretty
+  important though I've seen subtle bugs
+  introduced where people return the
+  sentinel value but they haven't actually
+  reported an error usually because they
+  think they know that an error will be
+  reported by some other phase in the
+  compiler but then because they are
+  they're not wrong about that but but
+  they're wrong about the ordering and the
+  phase actually comes later and the phase
+  winds up being skipped because we saw
+  this error value and we thought that
+  there already was an error so we don't
+  want to report duplicate errors so you
+  really want to keep this invariant very
+  clear that
+  you know you actually reported the error
+  right there then you can produce a
+  sentinel value or you got one from
+  somebody else and then it will work much
+  better so this this might be an example
+  of you know just basically whenever you
+  make something that represents a type or
+  whatever just include an error in there
+  so now you can have integer character or
+  error and propagated along and that the
+  thing that the main problem here is you
+  get to this point of sort of diminishing
+  returns of how much precision if you
+  really want to take this notion of an
+  error sentinel all the way I mean the
+  goal is basically to never give users an
+  error that is you know if you saw an
+  error earlier on you never want to put a
+  second error related to that code
+  because you really don't know what's
+  happening right
+  ideally however that can be difficult
+  right so if we have like this structure
+  that stores the signature of a method it
+  says here's the argument types there's a
+  list of types and a return type there's
+  a hidden assumption here for example
+  that we know the arity we know how many
+  arguments there are in the function but
+  maybe we couldn't really parse the
+  function signature there was a missing
+  comma or something and we're not really
+  sure how many arguments the user even
+  meant for there to be I don't know I've
+  tried some in different versions of the
+  compiler I've tried to be very propagate
+  this all the way out and at some point
+  it stops being worth the trouble so I
+  would say in a case like this I would
+  probably just say well you pick a best
+  guess and if they get an error like I
+  expected three arguments and you gave me
+  two you know oh well but so it's not
+  exactly easy but I think if you know the
+  right place to cut it off it works
+  pretty well so yeah
+  [Applause]
+  yeah yeah right that's a legacy of the
+  older so so so Rusty's I'm kind of
+  blurring the lines as I said the this
+  idea of never stopping is basically me
+  saying don't do what we did in rusty and
+  when I've and when we've been
+  reimplemented us see and we've not and
+  we've used the approach I'm describing
+  here it's been much much easier but what
+  we do in rusty is basically that it's
+  some hybrid of we don't throw the error
+  immediately we used to do that too but
+  we stopped doing that usually but we do
+  have big phases where we sort of say
+  let's if there have been any errors thus
+  far there's no point in going further
+  because the data is so corrupt that is
+  something we're trying to remove but it
+  is difficult because the assumptions are
+  you know you it's just you don't realize
+  what where you've implicitly made a
+  dependency and you have to kind of sort
+  that out
+  everything is using uses that still
+  means more to learn a song she wrote
+  no no yeah the goal is to have no point
+  like that
+  what instead would happen is that let's
+  say that you have typing errors within a
+  function you might not get borrow
+  checkers for that function and maybe you
+  will actually depends right on how we do
+  it but I think the first phase would be
+  to make it much more granular and then
+  proceed from there I would actually like
+  I mean I think we should be able to give
+  you borrow checkers even in the face of
+  type errors as long as we can sort of
+  make some sense you know other parts of
+  the function make sense so we can type
+  those and I don't see any reason that
+  would be hard if or if we just do it
+  basically was they gonna say about that
+  there was oh I did want to mention one
+  interesting thing so this actually is
+  something we don't yet handle in salsa
+  but that is related to that which is
+  I've been describing to you this whole
+  thing of out of order execution and so
+  on but one of the problems comes up how
+  do you actually report an error to the
+  user in the first place like what what
+  is an error kind of in this framework
+  and I think what I would like to do is
+  have some sort of side-effect channel
+  for these queries so right now what
+  we've done in the compiler is we built
+  on this is that they return basically
+  instead of saying they basically embed
+  errors into the values they return so
+  you'll get back a type the types of all
+  the things in your function and in there
+  is a list of errors and some other part
+  of the framework then has to go through
+  and sort of sweep over all the possible
+  places errors might occur and collect
+  them into one big vector and send them
+  to the ID and that's error prone because
+  you can overlook an error from from one
+  phase or another you might not remember
+  that you have to check not only the type
+  checker but also the parser can produce
+  errors and so on and so I'd like to have
+  some sort of mechanism where they can
+  it's also just so it's error-prone but
+  it's annoying because mostly in your
+  compiler you just want to ignore errors
+  right the whole point of this whole
+  Sentinel approach is that you can just
+  treat code like it's well typed and and
+  sort of ignore errors for the most part
+  unless you happen to see a sentinel
+  value and this winds up making them more
+  visible so what I would like to do is
+  have some way where you can say I signal
+  an error and it gets accumulated
+  will will basically handle all that for
+  you in the framework itself but we
+  haven't implemented it yet in rust see
+  what we actually do is we just dump them
+  to standard error and then we have us
+  and that's good because you get very
+  fast feedback it's bad because when you
+  re incremental eariy execute you want to
+  see the errors that's kind of a tricky
+  part you want to see the errors again
+  from even if we didn't have to rerun the
+  type checker you'd like to still see the
+  errors that resulted from the first run
+  so what we do is we buffer them up and
+  we save them and we have a whole bunch
+  of mechanisms here so basically if the
+  flow of errors is itself something I
+  glossed over but it's a kind of a pain
+  so cycles is an interesting case so that
+  I mentioned that the frame I mentioned
+  that way back when in the beginning that
+  if you have constants in rust they're
+  not allowed to have a cyclic
+  relationship for example that's a
+  simplifying rule for us you can imagine
+  that it could work in some cases but in
+  general this framework basically can't
+  handle cycles right if you ask to
+  compute a given value and it winds up
+  needing to compute itself that's a
+  problem I mean of course it would be a
+  problem in a regular program
+  also it would recurse infinitely and
+  what we currently do is we we take a
+  pretty hard line in the framework where
+  we actually basically panic which means
+  that in rust that's a exception but it
+  can't be caught so it's a pretty it's
+  actually not a good enough answer
+  because you don't want your compiler to
+  ever panic and sometimes these cycles
+  are kind of out of your control right it
+  depends on what order the user created
+  the cycle essentially so we're extending
+  it to allow you to permit controlled
+  errors but it's still a pretty harsh
+  mechanism essentially what happens is if
+  you get a cycle we will we will force
+  you to propagate back a return value
+  that doesn't depend on the inputs it's
+  just like a cyclic error value that you
+  can intercept it at some point but and
+  the reason we're were so mean about this
+  is because we've noticed some problems
+  when we were more flexible we used to
+  have a way to say try to do this
+  function and if it's already on the
+  stack give me back you know and a signal
+  a nun or something an optional value
+  I'll recover from the cycle because
+  there are a lot of times when you would
+  you know like to walk an entire graph
+  let's say and if you you have a cycle
+  you just want to ignore it or handle it
+  but it turns out that that's actually a
+  very easy way to get things wrong and so
+  let me give you an example that actually
+  this is code that's still in rusty today
+  but not configured on because this is
+  still an experimental code where we do
+  it sort of the wrong way and we have to
+  fix it at some point before we turn it
+  on and it it wasn't obvious to me how
+  this would go wrong at first so what's
+  happening here is we're doing inlining
+  and the way we do it
+  in rusty is we have this we have this
+  thing called mir which is our middle IR
+  and it's kind of a low-level IR for rust
+  sort of sort of like JVM but a little
+  higher level on that or alike bytecode
+  and we it goes through some some phases
+  right and the first one is we produce
+  the unoptimized mirror and then we
+  produce the optimized mirror in between
+  of course we do some optimizations on
+  the mirror and we want to do one of
+  those optimizations is inlining in like
+  taking one function body putting it into
+  the call site and it has some code that
+  looked looks roughly like this it says
+  okay if we're gonna compute the
+  optimized form of this function
+  let's get the unappeased oops
+  the unoptimized ir walk overall the call
+  sites and get the optimized version of
+  the function we're calling because you
+  don't want to inline the optimized one
+  in you'd rather have it already be
+  optimized before you you inline it and
+  and then we'll actually do the inlining
+  right and this works fine as long as
+  there's no cycle in the call graph if
+  there's a cycle of course then it would
+  panic which is not good so we said oh
+  well we can just we can we can just use
+  this this recovery up to our operation
+  and say well let's just check if it is
+  not a cycle then we'll inline in
+  otherwise we'll just ignore it because
+  actually you know we don't have to do
+  this perfectly like when you think about
+  it if things are in the same cyclic
+  component same strongly connected
+  component
+  you know that's basically an edge case
+  and it was it's good enough for our
+  optimizer we're gonna give this to all
+  of you anyway it's good enough for us to
+  just handle the trees up there we want
+  the leaf functions to get in line
+  so we tried this this version of the
+  code and it does indeed work it will do
+  it will optimize the Leafs of a call
+  graph into their callers it won't handle
+  the cyclic case but the problem is it
+  does actually handle the cyclic case it
+  just doesn't handle it fully and what I
+  mean by that is let's suppose I have foo
+  and bar to call one another if I start
+  by optimizing foo then I'm gonna try to
+  optimize bar and then I'm gonna fail
+  because of the cycle and I'm gonna
+  return back and so what will happen is I
+  will produce an optimized bar and I will
+  inline it into foo but I won't do the
+  reverse but if I start from bar I'm
+  gonna produce and optimize through an in
+  line into bar so I'm going to get
+  non-deterministic compilation results
+  depending on which order I did the
+  processing in and that's not good when
+  you're doing this on demand compilation
+  and all this stuff one of the key
+  constraints that we want to produce is
+  that you basically can't have
+  non-deterministic results right and the
+  framework generally does I think ensure
+  that although I have not tried to prove
+  it maybe I'm wrong if one of you sees an
+  edge case please come talk to me but
+  other people have proven it for similar
+  frameworks that's probably true but this
+  was a case where we we kind of by being
+  too simplistic we failed that so the
+  question is well how can I handle this
+  then what what should I do in a case
+  like this and one approach the one I
+  think we should do in Rusty at least is
+  that you make a sort of master query
+  that computes the graph and so this
+  might for example compute the call graph
+  for the entire thing you're compiling
+  would walk all the functions figure out
+  who calls one another and detect the
+  cycles and it basically instead of
+  having the walk be done through the
+  framework you're moving the walk into
+  into a single query right and you're
+  going to compute back out here's the
+  list of strongly connected
+  opponents here's the order in which you
+  should process them and this is what a
+  lot of compilers do of course and if we
+  did it that way we wouldn't have this
+  problem but we have the downside is in
+  order to optimize any function we have
+  to recompute the whole call graph every
+  time because we haven't broken it up
+  into sub pieces so I don't actually have
+  a good answer for that I think that's a
+  tricky problem this is one of the cases
+  where there's some advantages to moving
+  from to a higher level representation of
+  what you're doing because you might be
+  able to do finer grained incremental
+  results however the thing I would say is
+  that what I've observed is that it's
+  basically good enough in most the time
+  because you don't need to do these sort
+  of optimizations for people when they're
+  pressing the dot to give them
+  completions because you don't need to
+  give the optimized code and when you're
+  actually generating the code this isn't
+  like computing the call graph is not a
+  big percentage of your compilation time
+  so you can just redo it it's okay
+  but I think handling it for when you if
+  you actually do want the incremental
+  reuse that's a little more tricky so
+  there's a bunch of cases in rust
+  the thing about cycles is that the
+  semantics of them really depends part
+  what makes it tricky it depends on
+  exactly what you're doing what you want
+  to do in the event of a cycle there's no
+  general correct answer well yeah and so
+  like just within rust we have cycles
+  that arise besides inlining name
+  resolution and trait resolution and each
+  has their own specific requirements
+  around like for example in trait
+  resolution sometimes it would be in try
+  trait resolution is figuring out whether
+  a type implements an interface or not
+  and that can be kind of complicated if
+  you say like the this this
+  this type implements display but only if
+  this other type implements display so
+  like a vector is is displayable on the
+  screen only if its elements are
+  displayable on the screen and they may
+  have their own requirements and you have
+  to sort of evaluate this and if there's
+  a cycle that basically means normally
+  that means no they do not implement
+  display because you want it to be a
+  cyclic but sometimes it's okay sorry
+  it can be tricky so okay mmm next thing
+  so the another another interesting
+  problem that has arisen is how do you
+  track the location of things in a file
+  so I mentioned a couple of times as my
+  example well if all I did was edit a
+  comment that shouldn't cause anything to
+  recompile right that's sort of true but
+  not exactly true because editing a
+  comment does affect the lining column
+  information for your data and if you
+  want to show an error on the screen you
+  need that information and so it might
+  actually in it and you're probably
+  embedding the line and column
+  information into your AST so it probably
+  does actually affect your result and one
+  of the things there are various ways to
+  get around this they kind of come back
+  to the tree trick that I showed earlier
+  so you know what what rusty was doing
+  and still is doing in order to track
+  location information was a was a highly
+  memory optimized representation where
+  basically we took all the input data
+  from all of your input files and put it
+  in one huge string and then we tracked
+  with a single 32-bit number you could
+  sort of get a span of bytes within that
+  string and usually those fans have a
+  very short length so we you know try to
+  like use five bits for that I don't know
+  what it is use some small number of bits
+  for the length and use the rest of it
+  for the location and it works pretty
+  well and sometimes it's overflows and we
+  have a fallback but that whole system
+  like is terrible for incremental right
+  because now if you change one file not
+  only did you invalidate all the location
+  information within the file but all the
+  other files that are in the same big
+  string are also changed so we've been
+  moving to different systems
+  one way is don't track the spans at all
+  or keep them separate like don't put
+  them into AST but have a separate table
+  that says for a given just for a given
+  ast node ID here's the span right and
+  that table may completely change and be
+  recomputed each time you parse but all
+  the intermediate values are just
+  carrying around the I
+  d of the ast node and that's much more
+  stable another way is to you can store
+  offsets from the previous sibling and
+  lengths or things like that but and
+  basically trying to compute you just
+  need to essentially all these schemes
+  boiled down to tracking enough that you
+  can figure out the actual lining column
+  later but trying to minimize what you're
+  carrying around in the moment so that
+  the idea so for example you could just
+  carry how long how long is each ast node
+  and then you can later walk the whole
+  AST and figure out well I don't know
+  that doesn't tell you where it began in
+  the file it only tells you how how long
+  it is but if you walk all the previous
+  nodes and sum up their lengths that'll
+  tell you at the beginning point and that
+  you can only do in the event of error so
+  maybe you don't need to do it at all
+  most of the time right this is basically
+  what it comes down to is tricks like
+  this and exactly which one is best I
+  don't think we know yet so another
+  interesting question yeah oh sorry yeah
+  that's a good question um I thought
+  about having a slide on that and I think
+  I forgot so thanks for mentioning it so
+  the question was how do you track the
+  spans across the sugar rings and
+  transformations and so so rust has also
+  a macro system which is highly relevant
+  here all right so the spans in in rust
+  are not only a line of text but they
+  also have a call stack essentially from
+  for tracking macro expansions across
+  them and we use that in a couple of
+  different ways one of the things that's
+  really useful for is exactly these tea
+  sugar rings so the problem there is if
+  you're deferring like for example we do
+  sugar our four loops in two while loops
+  but we don't want the users errors to
+  say to talk about while loops when they
+  typed for loop that would be confusing
+  so we track we use this stack to push on
+  and say well this is the span in the
+  file where this token appears but it
+  came from addy sugar ring from from a
+  from a for loop right and that way we
+  can customize the error message by
+  inspecting this stack you do need to
+  represent it I think it's kind of this a
+  similar problem so that's also part of
+  our very compact 32-bit representation
+  is tracking those stacks they luckily
+  occur kind of infrequently so you can
+  mostly not worry about them or I mean
+  you can they can be less efficient but
+  that's the basic idea though is you have
+  to track the stack up there
+  that's what I'm about to talk about
+  actually so perfect lead-in to the next
+  slide one of the things I think
+  traditional compilers like basically
+  love to throw away information all right
+  whenever they possibly can and I think
+  that's a good a nice thing to do it
+  makes your pump either simpler it's
+  better for incremental reuse for example
+  but yeah it's not always what you want
+  and the prime example is comments but
+  also whitespace what the rusts compiler
+  does right now this is another case
+  where we're people are there are
+  different opinions about what is best
+  and I'm not I don't have a firm one yet
+  but what the Russ compiler does is it it
+  has a traditional approach it throws
+  away all the comments and all the white
+  space but it keeps precise spans and so
+  you can sort of recover them by going
+  back to the original text which we also
+  have fake finding the line and column
+  number and sort of seeing where their
+  comments and you know whitespace around
+  it and stuff like that and I think that
+  the rust formatter so the code that
+  automatically reformats your your rusts
+  code does use that technique so it will
+  say let me go find in the in the space
+  between these two items let me go find
+  all the comments that were in there and
+  parts them and repost them
+  [Music]
+  [Applause]
+  so doc so we distinguish between dark
+  comments which are the ones that will
+  actually show up in the formatted
+  documentation and ordinary comments and
+  the comments are part of the compiler
+  and we keep they're part of the ast in a
+  formal way but so the downside of this
+  of course is that you have to do this
+  weird stuff to like recover the comments
+  you have to recompile and so the other
+  approach i think yeah so so this is what
+  I was saying that you can you can you
+  can sort of recover the comments and
+  things after the fact but there's
+  another approach which is I think well
+  for example what they use in Swift and
+  what's we're trying in a different
+  project where you actually keep all the
+  information oh really
+  well okay okay I'm getting close
+  where you actually keep all the
+  information in your in your tree the
+  problem is then you want to throw it
+  away and it's kind of annoying for all
+  the reasons now you have more
+  information than you need
+  so what Swift does for example as I
+  understand it is they have these two
+  layers they call red and black a black
+  tree is a fully contains all the details
+  of of the the comments and all the white
+  space and so on actually I think both
+  our trees do but but the main thing
+  about the black one is it doesn't have
+  it's it's it's all relative to their
+  current point it only has for example
+  the lengths of ast nodes as I mentioned
+  and it and so that means it can be
+  incrementally reused so if you reparse
+  and you know there's no been no changes
+  in this function you can just reuse it
+  but then the the red tree layers on top
+  and computes lazily all the other
+  context you would need and that's one
+  approach but the other one is to do this
+  kind of zooming out on in and I think
+  this is what Russy does this is what I
+  think the typescript compiler does so I
+  understand though I haven't read that
+  source and I'm not sure which is better
+  I I sort of leaned towards this one
+  myself but
+  that is to say leaving it out but being
+  able to recover it so let's see what
+  else did I want to say yeah not a lot
+  more the last thing I wanted to say is
+  that there's also this need to handle
+  threading when yours when your compiler
+  is an actor taking messages back and
+  forth
+  it needs to be able to kind of process
+  them and and always be responsive to the
+  editor as it makes changes so it's not
+  okay to just sit there and take over the
+  main thread and not answer questions so
+  what we do the salsa has a threading
+  model basically where there's a master
+  thread that is able to change the inputs
+  and then there are helper threads that
+  are only able to read and compute derive
+  values of course they're actually making
+  changes in the database but it's hidden
+  from you and there's basically a
+  readwrite lock here so if the master
+  thread goes to set an input and there
+  are still active helper threads out
+  there it will block until they've
+  completed but this blocking as I just
+  said is not so great because now you're
+  not responding to the users requests so
+  we have this notion of cancellation
+  where essentially if there's a master
+  thread wanting to change the input and
+  you're off computing some derive value
+  then you should panic that means they
+  will propagate an error will unwind all
+  the stuff your thread will die and while
+  that happens we just don't make changes
+  to the database basically and once all
+  the helper threads have have cleaned
+  themselves up the master thread can make
+  its change and we can keep going this is
+  what you basically want to do I think is
+  this kind of cancellation the exact
+  mechanism may vary but that's the basic
+  idea so that you can you know
+  essentially when people are typing and
+  they press dot and then they press
+  backspace and then they push dot again
+  type a little more you can recover and
+  handle all those things so
+  [Music]
+  yes if they have some I see I see yeah
+  so we don't cancel it the sort of
+  arbitrary we don't like inject a pair
+  wherever it happens to be but if if it
+  so they're in the middle of doing some
+  recomputation if they happen to complete
+  before we check for panic we will store
+  that like any other in criminality but
+  if they panic in the middle of the
+  function then we just leave the state as
+  it was right and that way when you after
+  you apply the new diff and then you will
+  presumably restart those computations
+  they will just reacts cute one other
+  thing I didn't mention but I'll mention
+  here which I think is relevant is when
+  you have multiple threads we also
+  support many threads at once doing
+  different things so you can type check
+  all your functions in parallel or
+  whatever but they might all need to
+  access the same value so they might say
+  what is the signature of this function
+  that they're both calling or something
+  right and what we currently do this is
+  this is one of those places where I
+  think the best strategy also will depend
+  what we currently do is they block so
+  one of them wins it computes the value
+  of the others block and wait for it and
+  then we react this seems to work pretty
+  well we've measured it but there are
+  many alternatives right like they could
+  both go and do the computation because
+  it's a pure functional computation as
+  long as we handle the error propagation
+  right we'll be fine and what you want to
+  do probably depends on how much work
+  that is
+  like computing the signature is very
+  cheap usually but maybe doing the whole
+  type check is not so you don't really
+  want to do it twice so I think my
+  conclusions as I said I thought I would
+  when I when I agreed to give this talk I
+  thought surely by now we'll have a
+  really great working system and I'll you
+  know know I think exactly what I think
+  you should do but I don't but what I do
+  know is you should at least start with
+  an on demand style in my opinion that
+  proven to be a nice way to write a think
+  to write the compiler it doesn't have to
+  be
+  just starting with basically an
+  on-demand style using error sentinels
+  and a few other I think those are the
+  two big things from the beginning I
+  think will sort of put you in the right
+  ballpark for building a responsive IDE
+  and the details of and the details of
+  even how you represent your spans but
+  you know definitely stuff like
+  optimizing your memoization and does the
+  thread how do you handle cancellation is
+  less important at the end of the day and
+  easier to add on after the fact but
+  those two things are really quite
+  painful so that's my my lesson and any
+  final questions I guess
+  yeah that's a very good question so I
+  alighted parser error recovery yes so
+  the answer is the way you would do it is
+  basically yes it is also a sentinel
+  value so you have an ast node that is
+  error and it includes you know some
+  chunk of tokens and some information
+  about the error usually and in practice
+  there's a lot of this is another of
+  those things where people treat parsing
+  like a solve problem but actually you
+  know this is tricky what I've seen in
+  practice for error recovery though is
+  that it's usually people do a pretty
+  simple strategy and it works pretty well
+  basically looking ahead for like a
+  semicolon that's probably a strong
+  signal or some other key word or
+  something that really means like let's
+  you reorient where you are and let the
+  rest fall out but yeah it's a good
+  question is the on demand as important
+  for the backend probably not yeah so I
+  think what we do in the RUS compiler of
+  course LVM does most of our back-end
+  compilation so what we do is we we do
+  use on-demand sort of up until we
+  basically create the elevate my our
+  on-demand but then we ship it off to LVM
+  and let it do its thing and at that
+  point yeah you can just let it run it's
+  also less vital for this incremental
+  reuse I think and also the cycles and
+  stuff gets much more complicated there
+  [Music]
+  yeah if you can write a one-pass
+  compiler like turbo pascal for your
+  language then maybe you should just do
+  that I think that's a good point
+  it just often in practice doesn't turn
+  out that simple these days so I yeah I
+  think that's the bottom line
+  the back door we can bring in very
+  expensive competition Liberty
+  competition
+  these masturbate is really needed
+  because I mean I better just go and
+  introduce many of these masters oh yeah
+  I think that so I think that's correct
+  you could make an on-demand program
+  where sort of you could take the old
+  model of do the face on the whole
+  program and just make a query per face
+  with no inputs essentially and you
+  wouldn't get very much benefit right so
+  it's not that the system falls down but
+  it's that your incremental performance
+  is some optimal
+  that's how we end up with more right so
+  yeah so setting up with some smallish
+  number of very big queries and then
+  rebuilding I think that that would work
+  fine and we've been trying to do that
+  also it it is definitely easier if you
+  do it from the beginning though then
+  coming back to added later but but yeah
+  that is a reasonable approach in my
+  opinion I think the places where you
+  really need the bigger queries are
+  mostly around this cycles and things
+  like that yeah that's where you either
+  the cycles or sort of the produce all
+  the errors compile the whole program the
+  sort of batch compilation and end points
+  those are the two places I think you'll
+  find that if you're doing the finer
+  grained stuff it's not that it's quite
+  natural to make it like make it finer
+  grained I'm not sure if you did the
+  approach of making one query per phase
+  you might find it kind of hard later on
+  to slice them up you could do it it just
+  might be more work than you then it
+  would have been to do it from the
+  beginning
