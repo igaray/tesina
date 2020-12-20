@@ -4,37 +4,25 @@
 
 Many compiler textbooks and courses treat compilation as a "batch process", where the compiler takes in a bunch of input files, executes a suite of comiler passes, and ultimately produces object code as output. Increasingly, though, users expect integration with IDEs like VSCode, which requires a different structure. Moreover, many languages have recursive constructs where the correct processing order is difficult to determine statically. Nicholas will discuss some of the work the Rust team has been doing on restructuring the compiler to support incremental compilation and IDE integration.
 
-https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html#1
+https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
 
-# pipelines and passes
+# Pipelines and Passes
 
-  when I started writing compilers, we used the dragon book I learned this classic structure of how to write a compiler which was all about passes
+  When I started writing compilers, we used the Dragon Book.
+  I learned this classic structure of how to write a compiler which was all about passes.
+  That is precisely how rustc used to look, the way the Rust compiler was written and the way compilers usually work is this batch compilation model, in which you run the compiler, process the whole source and produce an output and maybe get an error out of it.
 
-  that is precisely how rustc used to look
+  The reason that there has been a change is that the way you interact with compilers has changed.
+  These days people are working with IDEs and you want a different way to interact with the source in this model.
+  You want to take messed up inputs, make sense of them, you want to be able to do compiletions and jump to definitions in an interactive way
 
-  the reason that there has been a change is that the way you interact with comilers has changed
+  What if the Dragon Book were written today? I think there are more questions than answers, we dont have all the things written down to make the book, but I have a lot of experiences of what we tried and the challenges that come with those experiences.
 
-  the way the rust compiler was written and the way compilers usually work is this batch compilation model
+  The first thing to learn about this environment today is that there has been a big shift during the last couple of years in how IDEs are written. Microsoft introduced VS Code, which is an amazing editor, but among the many amazing things it introduced is the LSP (Language Server Protocol), which is an intermediate protocol for interfacing between the language that's being compiled and the editor that is interacting, so that neither have to be tied to each other.
 
-  where you run it, process the whole source and you produce an output and maybe get an error out of it
+  It used to be the case that when you wrote, e.g. an Eclipse plugin for your language, it just worked in Eclipse and if you wanted to provide the same extension for Netbeans, Emacs, Vim, etc you would have to rewrite most of the plugin. LSP lets you sidestep that.
 
-  these days people are working with ides and you want a different way to interact with the source when your in this model
-
-  you want to take messed up inputs, make sense of them, you want to be able to do compiletions and jump to definitions in an interactive way
-
-  my goal today: what if the dragon book were written today
-
-  i think there are more questions marks than answer, we dont have all the things written down to make the book
-
-  but I have a lot of experiences of what we tried and the challenves
-
-  the first thing to learn about this environment today is that there has been a big shift the last couple of years in how ides are written is that microsoft introduced vs code, which is an amazing editor,
-  but among the many amazing things it introduced is the LSP, which is an intermediate protocol for interfacing between the language that's being compiled and the editor that's interacting, so that neither have to be tied to each other
-
-  it used to be that when you wrote an eclipse plugin for your language it just worked in exclsipse, and then if you wanted to extend for netbeans, and emacs, and vim, etc
-  but LSP lets you sidestep that
-
-  so for example in the rust compiler we have a language service, we actually ahve to and they work for emacws, vi, whatever
+  For example in the Rust community we have a language service which works for Emacs, Vim, etc, whatever editor or IDE supports the LSP.
 
 # The "responsive" compiler
 
@@ -42,7 +30,7 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html#1
   - editor sends diffs and requests completions, diagnostics
   - compiler responds
 
-  what you wind up in this model is that instead of having the compiler be something that you run in the command line it's more of an actor, the editor is sending you diffs of the files youre compoiling, and you are responding to them and sending back diagnostics,
+  In this model instead of having the compiler be something that you run in the command line it's more of an actor, the editor/IDE is sending you messages with diffs of the files youre compiling, and you are responding to them and sending back diagnostics. For example, we might want to know the completions
   and it might say, ok, we want to know what are the completions at this point, and your compiler responds with a vector of responses
 
   key point: need to be able to respond as quickly as possible
@@ -55,7 +43,7 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html#1
 
   and i go back out to the function, i have to go back out to other functions sometimes, but not all of them, find their signatures, etc
 
-# demand driven
+# Demand driven
 
   so what weve been trying to do is move to a more demand driven architecture
 
@@ -65,7 +53,7 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html#1
   you have a given goal you need to do, and that goal is implemented by some function that uses other functions, and you go backwards, but you try to keep this set to a minimum
   at the end of the day you still have thesed traditional compiler passes, logical, but you might not be executing them completely and you might now tbe executing them in order
 
-# why should you care about IDEs?
+# Why should you care about IDEs?
 
   there are some things ive noticed in trying to make this transformation that surprised me
   and there some reasons to try to do an ide friendly approach, even if its not a full ide, from the beginning
@@ -77,7 +65,7 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html#1
     to make or not make certain desicions
   - stric phase separation is impossible anyway
 
-# dependencies matter
+# Dependencies matter
 
   rust allows arbitrryu nesting of delcarations inside fuinctions
   an example of something we would not have done had we implemented ides earlier on
@@ -112,7 +100,7 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html#1
          // auto-completion here?
   }
 
-# strict phase separation is impossible anyway
+# Strict phase separation is impossible anyway
 
   the other reason that led us in this direction, is that in most compiler that I've worked on , if you have a strict phase spearation in which you fully resolve all the symbols, then type check all the bodies, and then... it e3nds up kind of constraining, and you often need to process your source in a difficult order
   in many languages its a constraint you dont want
