@@ -2,15 +2,19 @@
 \section*{Responsive compilers - Nicholas Matsakis - PLISS 2019}
 \cite{niko2019responsive}
 
-Many compiler textbooks and courses treat compilation as a "batch process", where the compiler takes in a bunch of input files, executes a suite of comiler passes, and ultimately produces object code as output. Increasingly, though, users expect integration with IDEs like VSCode, which requires a different structure. Moreover, many languages have recursive constructs where the correct processing order is difficult to determine statically. Nicholas will discuss some of the work the Rust team has been doing on restructuring the compiler to support incremental compilation and IDE integration.
+Many compiler textbooks and courses treat compilation as a "batch process", where the compiler takes in a bunch of input files, executes a suite of comiler passes, and ultimately produces object code as output.
+Increasingly, though, users expect integration with IDEs like VSCode, which requires a different structure.
+Moreover, many languages have recursive constructs where the correct processing order is difficult to determine statically.
+Nicholas will discuss some of the work the Rust team has been doing on restructuring the compiler to support incremental compilation and IDE integration.
 
 https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
 
 # Pipelines and Passes
 
   When I started writing compilers, we used the Dragon Book.
-  I learned this classic structure of how to write a compiler which was all about passes.
-  That is precisely how rustc used to look, the way the Rust compiler was written and the way compilers usually work is this batch compilation model, in which you run the compiler, process the whole source and produce an output and maybe get an error out of it.
+  I learned this classic structure of how to write a compiler which was all about passes
+  the way compilers usually work is this batch compilation model, in which you run the compiler, process the whole source and produce an output and maybe get an error out of it.
+  That is precisely how rustc, the Rust compiler, was written; and
 
   The reason that there has been a change is that the way you interact with compilers has changed.
   These days people are working with IDEs and you want a different way to interact with the source in this model.
@@ -23,6 +27,8 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
   It used to be the case that when you wrote, e.g. an Eclipse plugin for your language, it just worked in Eclipse and if you wanted to provide the same extension for Netbeans, Emacs, Vim, etc you would have to rewrite most of the plugin. LSP lets you sidestep that.
 
   For example in the Rust community we have a language service which works for Emacs, Vim, etc, whatever editor or IDE supports the LSP.
+
+<<<MARK>>>
 
 # The "responsive" compiler
 
