@@ -2,6 +2,15 @@
 \section*{Responsive compilers - Nicholas Matsakis - PLISS 2019}
 \cite{niko2019responsive}
 
+@online{niko2019responsive,
+    author = "Nicholas Matsakis",
+    title = "Youtube: Responsive compilers - Nicholas Matsakis - PLISS 2019",
+    url = "https://www.youtube.com/watch?v=N6b44kMS6OM",
+    year = {2019},
+    month = {06},
+    keywords = "rustc,incremental",
+}
+
 Many compiler textbooks and courses treat compilation as a "batch process", where the compiler takes in a bunch of input files, executes a suite of comiler passes, and ultimately produces object code as output.
 Increasingly, though, users expect integration with IDEs like VSCode, which requires a different structure.
 Moreover, many languages have recursive constructs where the correct processing order is difficult to determine statically.
@@ -9,16 +18,19 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
 
 https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
 
+<!-- WHY --------------------------------------------------------------------->
+
 # Pipelines and Passes
 
-  When I started writing compilers, we used the Dragon Book.
-  I learned this classic structure of how to write a compiler which was all about passes
-  the way compilers usually work is this batch compilation model, in which you run the compiler, process the whole source and produce an output and maybe get an error out of it.
-  That is precisely how rustc, the Rust compiler, was written; and
+<<<MARK>>>
 
-  The reason that there has been a change is that the way you interact with compilers has changed.
-  These days people are working with IDEs and you want a different way to interact with the source in this model.
-  You want to take messed up inputs, make sense of them, you want to be able to do compiletions and jump to definitions in an interactive way
+  When I started writing compilers, we used the Dragon Book as a reference, in which I learned the classic structure of how to write a compiler in passes.
+  The way compilers usually work in this batch compilation model is one runs the compiler, processes the whole source and produces an output, and maybe gets an error out of it.
+  That is precisely how rustc, the Rust compiler, was written in the beginning.
+
+  The reason that there has been a change is that the way one interacts with compilers has changed.
+  These days people are working with IDEs and want a different way to interact with the source in this model.
+  You want to take messed up inputs and make sense of them, you want to be able to do completions, and jump to definitions in an interactive way
 
   What if the Dragon Book were written today? I think there are more questions than answers, we dont have all the things written down to make the book, but I have a lot of experiences of what we tried and the challenges that come with those experiences.
 
@@ -27,8 +39,6 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
   It used to be the case that when you wrote, e.g. an Eclipse plugin for your language, it just worked in Eclipse and if you wanted to provide the same extension for Netbeans, Emacs, Vim, etc you would have to rewrite most of the plugin. LSP lets you sidestep that.
 
   For example in the Rust community we have a language service which works for Emacs, Vim, etc, whatever editor or IDE supports the LSP.
-
-<<<MARK>>>
 
 # The "responsive" compiler
 
@@ -160,6 +170,8 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
   another way is more formal, higher level expression
   then you have to make sure that everything you do fits in to this framework or extend the framework
   so salsa is kind of a middle ground
+
+<!-- SALSA ------------------------------------------------------------------->
 
 # Salsa
 
@@ -519,6 +531,8 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
   like like type checks and so on that actually are
   the really convenient part about this is that you can sort of do this projection where you extract out the bits you actually needed and use that to constrain changes from propagating too far
 
+<!-- SUBTLETIES -------------------------------------------------------------->
+
 # Order matters
 
   some subtle points about this basic algorithm is that the first thing is that order matters a lot
@@ -593,6 +607,8 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
   But cut off as quickly as you can
 
   when you're done you kind of get this picture where you have a graph of computation and what you really want to do is reexecute the early steps but cut it off as quickly as you can
+
+<!-- LAYERING ---------------------------------------------------------------->
 
 # Layering
 
@@ -887,6 +903,8 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
 
   that kind of tuning is I think it's sort of annoying that it's necessary but if you have this framework it's or have a framework it's nice that you can you can do it relatively easily
 
+<!-- ERRORS ------------------------------------------------------------------>
+
 # Error handling
 
   now I want to talk about a few other sort of things that happen in practice one of them is error handling
@@ -1016,6 +1034,8 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
   you want to see the errors again, even if we didn't have to rerun the type checker you'd like to still see the errors that resulted from the first run
   so what we do is we buffer them up and we save them and we have a whole bunch of mechanisms here
   so basically if the flow of errors is itself something I glossed over but it's a kind of a pain
+
+<!-- CYCLES ------------------------------------------------------------------>
 
 # Handling cycles
 
@@ -1180,6 +1200,8 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
   and if there's a cycle that basically means normally that means no they do not implement display because you want it to be acyclic but sometimes it's okay
   it can be tricky
 
+<!-- PARSING ----------------------------------------------------------------->
+
 # Tracking location information ("spans")
 
   Various techniques:
@@ -1282,6 +1304,8 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
   - Eliding data is good
       - especially when it can be recovered
   - On-demand system is a good fit for this
+
+<!-- THREADING --------------------------------------------------------------->
 
 # Threading
 
