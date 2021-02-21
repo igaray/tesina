@@ -22,12 +22,11 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
 
 # Pipelines and Passes
 
-<<<MARK>>>
-
   When I started writing compilers we used the Dragon Book as a reference, which teaches this classic structure of how to write a compiler in passes.
   The way compilers usually work is this batch compilation model, in which one runs the compiler, process the whole source and produce an output and maybe gets an error out of it.
   That is precisely how rustc, the Rust compiler, was written in the beginning.
 
+<<<MARK>>>
 
   The reason that there has been a change is that the way one interacts with compilers has changed.
   These days people are working with IDEs and want a different way to interact with the source in this model.
