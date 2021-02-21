@@ -24,9 +24,10 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
 
 <<<MARK>>>
 
-  When I started writing compilers, we used the Dragon Book as a reference, in which I learned the classic structure of how to write a compiler in passes.
-  The way compilers usually work in this batch compilation model is one runs the compiler, processes the whole source and produces an output, and maybe gets an error out of it.
+  When I started writing compilers we used the Dragon Book as a reference, which teaches this classic structure of how to write a compiler in passes.
+  The way compilers usually work is this batch compilation model, in which one runs the compiler, process the whole source and produce an output and maybe gets an error out of it.
   That is precisely how rustc, the Rust compiler, was written in the beginning.
+
 
   The reason that there has been a change is that the way one interacts with compilers has changed.
   These days people are working with IDEs and want a different way to interact with the source in this model.

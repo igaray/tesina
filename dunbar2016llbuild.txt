@@ -24,6 +24,7 @@
   Aunque esto funciona, el problema es que el compilador no tiene control sobre como es invocado, dado que esto depende del build system.
 
   Una propuesta es construir un servicio de compilador, pero esto presenta otros problemas.
+  \cite{dunbar2016}
 
 ## Como se construye software hoy
 
@@ -35,6 +36,7 @@
     - entrada/salida fija: existe un conjunto limitado de lugares en los cuales se puedeen leer y escribir datos; si el compilador quisera cachear algo durante la sesion de compilacion, no hay un lugar estandard o consensuado donde hacerlo.
 
   Desde cierto punto de vista, esto constituye un contrato API, pero es un API que no ha cambiado en decadas.
+  \cite{dunbar2016}
 
 ## Como se podria construir software
 
@@ -50,6 +52,7 @@
     se pasa mucho tiempo en un build repitiendo trabajo al instanciar el mismo template, creandolos, verificando los tipos, generando codigo, y finalmente pasando todo el resultado al linker, solo para que elimine la mayoria.
 
   Para todos estos casos lo que se requiere es evolucionar el API entre el compilador y el build system.
+  \cite{dunbar2016}
 
 ## Y el cache de modulos?
 
@@ -63,6 +66,7 @@
   - utiliza su propio esquema de manejo de consistencia de cache, tiene pocas herramientas de debuggeo, y tiene que observar los archivos y entender cuando necesita rehacer el build de modulos
   - tiene su propio mecanismo de desalojo de cacheo
   - es opaco al scheduler del sistema de build, si uno comienza un conjunto de tareas de build y todas requieren del mismo modulo, desde el punto de vista del sistema de build, va a bloquear esperando a esos modulos, pero podria estar haciendo mas trabajo
+  \cite{dunbar2016}
 
 ## El modelo ideal de construccion de software
 
@@ -83,6 +87,7 @@
   - un sistema de build extensible, i.e. un sistema de build que ha sido diseñado con la idea de que las herramientas con las que interactua deberian poder conectar mas profundamente que solo a traves de un subproceso
     cuando se invoca make o ninja, esperan que se los invoque a traves de un subproceso, y hay pocas maneras de poder interactuar con ellos
   - plugins de compilador
+  \cite{dunbar2016}
 
 ## Presentando llbuild
 
@@ -104,6 +109,7 @@
     - soportar scheduling de tareas dinamico
       durante un build de e.g. llvm se tienen muchas tareas cpu-bound, como correr el compilador, y muchas taras io-bound, como correr el linker
     - soportar un api 'pluggable'
+  \cite{dunbar2016}
 
 ### llbuild architecture
 
@@ -117,6 +123,7 @@
     - las funciones son abstractas
     - c++ como api entre tareas
   - sobre este nucleo se construyen sistemas de build de mas alto nivel (e.g. una implementacion de ninja, un manejador de paquetes)
+  \cite{dunbar2016}
 
 ### llbuild engine
 
@@ -129,6 +136,7 @@
     una tarea puede solicitar otras claves de entrada como parte de su trabajo
 
   El nucleo del motor puede ser usado directamente para propositos de computacion general
+  \cite{dunbar2016}
 
 ### Ejemplo: ackerman
 
@@ -153,6 +161,7 @@
   Cuando se comienza una tarea, se recibe una notificacion.
   Cuando el motor ha computado un resultado que se solicito, se lo devuelve al codigo que lo solicito.
   Cuando todas las entradas que tu tarea solicito han sido computados, entonces completa la tarea inicial y termina.
+  \cite{dunbar2016}
 
 ## Una arquitectura nueva
 
@@ -160,6 +169,7 @@
   - un compilador basado en librerias
   - un sistema de build extensible
   - un sistema de plugins de compilador
+  \cite{dunbar2016}
 
 ## Estado actual de llbuild
 
@@ -167,3 +177,4 @@
   Pasar a "la nueva arquitectura" sigue siendo dificil, principalmente por la dificultad de refactorear compiladores existentes, y los beneficios se empiezan a ver recien cuando la mayor parte del trabajo se ha hecho.
   Es dificil deshacer 40 años de precedente de un dia para el otro.
   Desde su publicacion, la implementacion de ninja basada en llbuild tiene mejor performance en la mayoria de las situaciones de mundo real (e.g. build de clang/llvm en variedad de hardware distinto).
+  \cite{dunbar2016}

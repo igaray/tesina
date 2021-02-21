@@ -115,7 +115,7 @@
     Por ejemplo, al renombrar un un metodo "read", la herramienta no deberia reemplazar identificadores como "readyState" que contienen el identificador a renombrar, ni tampoco reemplazar porciones de comentarios. Tampoco deberia suceder que renombrar una variable local afecte a variables con nombres similares en otros alcances.
     \cite{language_server_protocol_wiki}
 
-    Los compiladores e interpretees convencionales son usualmente incapaces de proveer estos servicios de lenguaje, dado que estan implementados con el objetivo de o bien transformar el codigo fuente en codigo objeto o ejecutar inmediatamente el codigo.
+    Los compiladores e interpretes convencionales son usualmente incapaces de proveer estos servicios de lenguaje, dado que estan implementados con el objetivo de o bien transformar el codigo fuente en codigo objeto o ejecutar inmediatamente el codigo.
     Adicionalmente, los servicios de lenguaje deben poder manejar codigo que no esta bien formado, e.g. cuando el programador esta en el medio de editar y no ha terminado de escribir una expresion, procedimiento, u otra construccion del lenguaje.
     Mas aun, pequeños cambios que ocurren durante la escritura normalmente cambian la semantica del programa.
     Para poder proveer feedback instantaneo al usuario, la herramienta de edicion debe poder evaluar muy rapidamente las consequencias sintacticas y semanticas de una modificacion especifica.
@@ -430,7 +430,7 @@
     \cite{rust_blog_incremental_compilation}
 
   \addcontentsline{toc}{section}{How Do You Make Something "Incremental"? [Woe16]}
-  \section*{How Do You Make Something "Incremental"? [Woe16}
+  \section*{How Do You Make Something "Incremental"? [Woe16]}
 
     Ya se detallo que computar algo incrementalmente significa actualizar solo aquellas partes de la salida de la computacion que necesita ser adaptada en respuesta a los cambios dados en las entradas de la computacion.
     Una estrategia basica que podemos emplear para lograr esto es ver una computacion grande (tal como compilar un programa completo) como una composicion de muchas computaciones pequeñas interrelacionadas que construyen una sobre otra.
@@ -802,6 +802,7 @@
     https://internals.rust-lang.org/t/next-steps-for-rls-rustc-and-ide-support/8428
     https://internals.rust-lang.org/t/next-steps-for-reducing-overall-compilation-time/8429
     https://blog.jetbrains.com/kotlin/2020/09/the-dark-secrets-of-fast-compilation-for-kotlin/
+    https://github.com/rust-analyzer/rust-analyzer/blob/master/docs/dev/architecture.md
     \end{itemize}
 
   \item Salsa
