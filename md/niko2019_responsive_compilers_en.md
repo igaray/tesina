@@ -26,19 +26,19 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
   The way compilers usually work is this batch compilation model, in which one runs the compiler, process the whole source and produce an output and maybe gets an error out of it.
   That is precisely how rustc, the Rust compiler, was written in the beginning.
 
-<<<MARK>>>
-
   The reason that there has been a change is that the way one interacts with compilers has changed.
-  These days people are working with IDEs and want a different way to interact with the source in this model.
-  You want to take messed up inputs and make sense of them, you want to be able to do completions, and jump to definitions in an interactive way
+  These days people work with IDEs and want a different way to interact with the source in this model.
+  It's necessary to accept erroneous inputs and make sense of them, perform source code completions, and jump to definitions in an interactive way.
 
-  What if the Dragon Book were written today? I think there are more questions than answers, we dont have all the things written down to make the book, but I have a lot of experiences of what we tried and the challenges that come with those experiences.
+  What if the Dragon Book were written today?
+
+  There seem to be more questions than answers, not everything needed to make the book has been written down, but the rustc implementation community has a lot of experiences of what they tried and the challenges that come with those experiences.
 
   The first thing to learn about this environment today is that there has been a big shift during the last couple of years in how IDEs are written. Microsoft introduced VS Code, which is an amazing editor, but among the many amazing things it introduced is the LSP (Language Server Protocol), which is an intermediate protocol for interfacing between the language that's being compiled and the editor that is interacting, so that neither have to be tied to each other.
 
   It used to be the case that when you wrote, e.g. an Eclipse plugin for your language, it just worked in Eclipse and if you wanted to provide the same extension for Netbeans, Emacs, Vim, etc you would have to rewrite most of the plugin. LSP lets you sidestep that.
 
-  For example in the Rust community we have a language service which works for Emacs, Vim, etc, whatever editor or IDE supports the LSP.
+  As an example in the Rust community we have a language service which works for Emacs, Vim, or any editor or IDE which supports the LSP.
 
 # The "responsive" compiler
 
@@ -46,40 +46,42 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
   - editor sends diffs and requests completions, diagnostics
   - compiler responds
 
-  In this model instead of having the compiler be something that you run in the command line it's more of an actor, the editor/IDE is sending you messages with diffs of the files youre compiling, and you are responding to them and sending back diagnostics. For example, we might want to know the completions
-  and it might say, ok, we want to know what are the completions at this point, and your compiler responds with a vector of responses
+  In this model instead of having the compiler be something that one runs by the command line it's more of an actor, the editor/IDE sends it messages with diffs of the files the user is compiling, and the compiler responds to them and sends back diagnostics.
+  For example, the user might want to know the completions available at a certain point in the source code and the compiler responds with a vector of possible completions.
 
-  key point: need to be able to respond as quickly as possible
+  The key point is that the compiler needs to be able to respond as quickly as possible.
 
-  so you wind up with a pretty different structure
+  Thus one has to consider what the minimum information needed to answer those user requests, whether the compiler can process just that to respond as fasta as possible.
 
-  andd you ahve to think about what is the minimum information you need to answer that requests, and can you process just that so you can get responses as fast as possible
+  Thus, instead of a type checker that walks all the sources and performs all steps for all functions, one could request the type checking of just one  statement and compute how much context is needed to do that.
 
-  so instead of a type checker that walks all the sources and does all the things for all the functions, ok i just need to type  check this statement, how much context do i need to do that
-
-  and i go back out to the function, i have to go back out to other functions sometimes, but not all of them, find their signatures, etc
+  In this way a rather different structure for the compiler results.
 
 # Demand driven
 
-  so what weve been trying to do is move to a more demand driven architecture
+  What the rustc compiler team has been trying to do is move to a more demand driven architecture.
 
-  - start from goal
-  - figure out what is needed for that
+  - Start from goal
+  - Figure out what is needed for that
 
-  you have a given goal you need to do, and that goal is implemented by some function that uses other functions, and you go backwards, but you try to keep this set to a minimum
-  at the end of the day you still have thesed traditional compiler passes, logical, but you might not be executing them completely and you might now tbe executing them in order
+  A given goal is implemented by some function that requires some subgoals, implemented by other functions, and works backwards, trying to keep this set to a minimum.
+
+  After this reorganization one still has these traditional compiler passes, but they might not be executed completely nor in a fixed order.
 
 # Why should you care about IDEs?
 
-  there are some things ive noticed in trying to make this transformation that surprised me
-  and there some reasons to try to do an ide friendly approach, even if its not a full ide, from the beginning
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-  - you have to write code in this language your making
-  - it really informs your language design,
+  There are some reasons justifying structuring a compiler by an IDE-friendly approach from the beginning which are not immediately obvious.
+
+  - one is forced to write code in the language being implemented
+  - the process informs the language design, as one becomes more aware
     you becoime much more aware of what depoendencies you need
     to figure out bits of information and that might lead you
     to make or not make certain desicions
-  - stric phase separation is impossible anyway
+  - strict phase separation is impossible anyway
 
 # Dependencies matter
 
