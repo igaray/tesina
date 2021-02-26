@@ -70,35 +70,29 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
 
 # Why should you care about IDEs?
 
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+  There are some reasons for structuring a compiler using an IDE-friendly approach from the beginning which are not immediately obvious.
 
-  There are some reasons justifying structuring a compiler by an IDE-friendly approach from the beginning which are not immediately obvious.
-
-  - one is forced to write code in the language being implemented
-  - the process informs the language design, as one becomes more aware
-    you becoime much more aware of what depoendencies you need
-    to figure out bits of information and that might lead you
-    to make or not make certain desicions
-  - strict phase separation is impossible anyway
+  - One is forced to write code in the language being implemented
+  - The process informs the language design, as one becomes more aware of dependencies needed to compute information, which in turn might lead to making certain decisions or not.
+  - Strict phase separation is impossible anyway
 
 # Dependencies matter
 
-  rust allows arbitrryu nesting of delcarations inside fuinctions
-  an example of something we would not have done had we implemented ides earlier on
-  rust has always allowed you to nest things rather arbitrarily for example a function with a struct inside of it
-  thats kinda handy, sometimes you want some local data that's not needed outside the function
+  An example of something that would not have been allowed had the rustc compiler implemented support for IDEs earlier on is allowing arbitrary nesting of declarations inside functions, e.g. a function with a struct inside of it.
+  This language feature is rather useful, as sometimes one wants some local data that's not needed outside the function.
 
+  ```rust
   fn foo() {
     // Equivalent to a struct declared at the root of the
     // file, but only visible inside this function.
     struct Bar{}
     let x = Bar{};
   }
+  ```
 
-  you can also put methods on the struct
+  One can also put methods on the struct:
 
+  ```rust
   fn foo() {
     struct Bar{}
     impl Bar {
@@ -106,51 +100,56 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
     }
     let x = Bar{};
   }
+  ```
 
-  a side effect of this is that auto-completion requires looking inside a lof of function bodies
-  what tha means is that I could have a struct visible from outside the function, and put methods on it inside the function, and I can call those methods from outside the function,
-  because the methods are dispatched based on the type, and we attached the method to type Bar, and if I have an instance of Bar from outsidfe the function I can call and what that means is that I'm doing completion on a value of type Bar, I really need to parse the inside of my function bodies to figure out if there is an impl that muight be releant, or else I wont get those methods
+  However a side effect of this is that auto-completion requires looking inside many function bodies: a struct could be visible from outside the function, and have methods defined on it inside the function, and since methods are dispatched based on type, those methods can be called from outside the function, ultimately requiring the parsing of all function bodies in scope and computing whether there is a relevant `impl` block for completion to provide the full set of methods available for that struct type.
 
+  ```rust
   struct Bar {}
   fn some_method() {
     let bar = Bar::new();
     bar. // <-- what methods should we offer as
          // auto-completion here?
   }
+  ```
 
 # Strict phase separation is impossible anyway
 
-  the other reason that led us in this direction, is that in most compiler that I've worked on , if you have a strict phase spearation in which you fully resolve all the symbols, then type check all the bodies, and then... it e3nds up kind of constraining, and you often need to process your source in a difficult order
-  in many languages its a constraint you dont want
+  Another reason that led the compiler team in this direction is that in most compilers, if there is a strict phase separation in which the compiler first resolves all symbols, then type checks all bodies, and so on, undesireable constraints appear and the source code must be processed in a difficult order.
 
-  Rust, for example, lets you do this:
+  Rust, for example, allows this:
 
+  ```rust
   const LEN: u8 = 1 + 1 + 1;
   const DATA: [u8; LEN] = [1, 1, 1]:
+  ```
 
-  what this means now is that there is an interdependency, in order to know the full type of DATA, I have to evaluate the constant LEN, and in order to evaluate the constant LEN, I have to type check its body and execute in some way, interpret it, symbolically execute it, to figure out what it's value is, and that means I can't fully type check all the constants in one order, without considering the dependencies between them before I can even figure out the type of data.
+  This defines an interdependency: in order to know the full type of `DATA`, the `LEN` constant must be evaluated, and the expression defining it must be type checked and evaluated in some way to compute its value. This implies that constants cannot be type checked in a single order without considering the dependencies between them.
 
-  What we used to do is some horrible hack.
+  `rustc`'s original approach was a horrible hack, involving essentially two implementions of some parts of the compiler, because a subset of the typechecker and evaluator that had enough features to evaluate symbols such as `LEN` and execute any part on demand was needed, and then the code that performed the full type checks came after.
 
-  We essentially had two implementations of some parts of the compiler, because we needed to have some subset of the typechecker and evaluator that was good enough to evaluate things like LEN and that could execute at any part on demand, and then we had the real code that did the full check that came after.
+  This duplication was a horrible pain, and in this more demand-based system this is not a problem because it can evaluate `LEN` on its own.
 
-  It was a horrible pain.
+  Another example:
 
-  And now in this more demand based system this isnt a problem because we can go and execute LEN on its own.
-
-  What if we were to do this?
-
+  ```rust
   const LEN: u8 = DATA[0] + DATA[1] + DATA[2];
   const DATA: [u8; LEN] = [1,1,1];
+  ```
 
-  Usually when you're doing this sort of thing you end up needed to detect cycles and this kind of falls out out of the framework we're working on basically.
+  In this example, `LEN` depends on `DATA` and vice versa.
+  The compiler needs to detect cycles and this falls out of the framework involving phase separation.
 
-  Other examples of phase separation:
-  - inferred types across function boundaries in e.g ML
-  - in rust, theres a bunch of things in the logic language: specialization, which requires solving some traits
-  - java and its lazy class file loading, how many different things the dot operator does in java, you will find that there is a bunch of lazyness, the set of classes a given classs can touch is determined as you walk the file you compile
+  Other examples of features complicating phase separation:
+  - Inferred types across function boundaries in e.g ML.
+  - In rust, there are several things in the logic language: specialization, which requires solving some traits.
+
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+  - Java and its lazy class file loading, how many different things the dot operator does in java, you will find that there is a bunch of lazyness, the set of classes a given classs can touch is determined as you walk the file you compile
   - how racket deals with phase separation and scheme macros
-
   in a lot of languages you find you want to evaluate some subset of the source and type check and be able to woirk with thme without necesarily processin ght whoel thing
 
 # Not a solved problem
