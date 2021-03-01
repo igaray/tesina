@@ -1,3 +1,4 @@
+<!--
 \addcontentsline{toc}{section}{Responsive Compilers}
 \section*{Responsive compilers - Nicholas Matsakis - PLISS 2019}
 \cite{niko2019responsive}
@@ -10,13 +11,14 @@
     month = {06},
     keywords = "rustc,incremental",
 }
+ -->
 
 Many compiler textbooks and courses treat compilation as a "batch process", where the compiler takes in a bunch of input files, executes a suite of comiler passes, and ultimately produces object code as output.
 Increasingly, though, users expect integration with IDEs like VSCode, which requires a different structure.
 Moreover, many languages have recursive constructs where the correct processing order is difficult to determine statically.
 Nicholas will discuss some of the work the Rust team has been doing on restructuring the compiler to support incremental compilation and IDE integration.
 
-https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
+- [Slides](https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html)
 
 <!-- WHY --------------------------------------------------------------------->
 
@@ -24,11 +26,19 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
 
   When I started writing compilers we used the Dragon Book as a reference, which teaches this classic structure of how to write a compiler in passes.
   The way compilers usually work is this batch compilation model, in which one runs the compiler, process the whole source and produce an output and maybe gets an error out of it.
-  That is precisely how rustc, the Rust compiler, was written in the beginning.
+
+  Traditional compiler model is a series of passes:
+  - lex(source) -> tokens
+  - parse(tokens) -> ast
+  - semantic_analysis(ast), type_check(ast)
+  - loop: apply optimizations
+  - etc
+
+  That is precisely how `rustc`, the Rust compiler, was written in the beginning, and still looks like today in some ways, since the effort to move away from this architecture is ongoing.
 
   The reason that there has been a change is that the way one interacts with compilers has changed.
   These days people work with IDEs and want a different way to interact with the source in this model.
-  It's necessary to accept erroneous inputs and make sense of them, perform source code completions, and jump to definitions in an interactive way.
+  It's necessary to accept erroneous inputs and make sense of them, perform source code completions, and jump to definitions in an interactive way, and to do this one needs to process just enough to answer the user's query.
 
   What if the Dragon Book were written today?
 
@@ -42,9 +52,9 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
 
 # The "responsive" compiler
 
-  - compiler as an actor
-  - editor sends diffs and requests completions, diagnostics
-  - compiler responds
+  - Compiler as an actor
+  - Editor sends diffs and requests completions, diagnostics
+  - Compiler responds
 
   In this model instead of having the compiler be something that one runs by the command line it's more of an actor, the editor/IDE sends it messages with diffs of the files the user is compiling, and the compiler responds to them and sends back diagnostics.
   For example, the user might want to know the completions available at a certain point in the source code and the compiler responds with a vector of possible completions.
@@ -141,36 +151,33 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
   The compiler needs to detect cycles and this falls out of the framework involving phase separation.
 
   Other examples of features complicating phase separation:
-  - Inferred types across function boundaries in e.g ML.
-  - In rust, there are several things in the logic language: specialization, which requires solving some traits.
-
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-  - Java and its lazy class file loading, how many different things the dot operator does in java, you will find that there is a bunch of lazyness, the set of classes a given classs can touch is determined as you walk the file you compile
-  - how racket deals with phase separation and scheme macros
-  in a lot of languages you find you want to evaluate some subset of the source and type check and be able to woirk with thme without necesarily processin ght whoel thing
+  - Inferred types across function boundaries in languages such as ML.
+  - In Java and its lazy class file loading, the dot operator performs many functions in a lazy way, such that the set of classes a given class can touch is determined as you walk the file being compiled.
+  - The way Racket deals with phase separation and scheme macros; in many languages with metaprogramming facilities one finds one wants to evaluate some subset of the source and type check and be able to work with them without necesarily processing the whole source.
+  - In rust, there are several things in the logic language related to traits, such as specialization, which requires solving some traits.
+    - A trait tells the Rust compiler about functionality a particular type has and can share with other types. We can use traits to define shared behavior in an abstract way. We can use trait bounds to specify that a generic can be any type that has certain behavior.
+    Note: Traits are similar to a feature often called interfaces in other languages, although with some differences.
+    Trait resolution is the process of pairing up an impl with each reference to a trait.
+    Trait specialization is ...
+    TODO: ask Niko to clarify.
 
 # Not a solved problem
 
-  what have we been actually doing to solve this
+  There are several approaches that can be taken to solve this situation:
 
-  - hand coded
-  - salsa
-  - more formal technique
-    - attribute grammars
-    - datalog or structured queries
+  - Hand coded
+  - Salsa
+  - More formal techniques
+    - Attribute grammars
+    - Datalog or structured queries
 
-  rustc takes an approach based on a framework called salsa it enables you to still write your compiler in a general purpose programming language what feels familiar
+  The hand coded approach has been used in practice in many languages and involves simply not having a framework but thinking very carefully about things, doing the same things as in the other approaches but in an open coded manner, such as figuring out if a symbol requires type checking, the dependencies needed, etc.
+  This approach is of course very practical, but can be prone to bugs, incremental inconsistencies, etc if for example a dependency is omitted while computing some information.
 
-  there are two different alternative to this,
+  Another technique is using a more formal, higher level expression system such as attribute grammars or datalog queries.
+  In this case one has to ensure that everything done by the compiler fits in this framework or extend the framework to amek it fit.
 
-  one of them, the hand coded version, ive seen more in practice in other places, is not having a framework but thinking very carefully about things, doing the same things but open coded, doing things by hand figuring out if im going to type check this, i need to figure out these dependencies, and making it work
-  that is of course very practical, it just can have bugs, incremental inconsistencies, etc if you have forgotten about a dependency between things
-  another way is more formal, higher level expression
-  then you have to make sure that everything you do fits in to this framework or extend the framework
-  so salsa is kind of a middle ground
+  rust-analyzer takes an approach based on a framework called salsa, which  enables you to still write your compiler in a general purpose programming language that feels familiar, in a kind of middle ground between the hand written and formal approaches.
 
 <!-- SALSA ------------------------------------------------------------------->
 
@@ -180,27 +187,31 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
     - inputs
     - derived queries
 
-  the high level idea of this framework is that you separate out the inputs to your compilation and then a bunch of derived stuff.
+  The high level idea of this framework is that the compilation is separated into the inputs to the compilation process and a set of computations derived from the inputs.
+  The derived queries are pure functions that can demand needed results from other queries, some of which may be inputs.
+  When one of these functions is used, the data and any input functions it uses are tracked, and when a change to one of the inputs occurs it can be propagated through the dependencies in order to avoid re-executing some of the computation.
 
-  the derived queries are basically pure functions that get to demand other results/queries, that they needs, some of which may be inputs and when we use one of these functions we track what bits of data did it use and ultimately which inputs did it use, and then whene theres a cahnge to one of these inputs we can propagate the change and try to avoid re executing some of these things.
+  There are a lot of systems in this space, for examples:
+  - adapton
+  - glimmer from the ember web framework
+  - build systems a la carte
 
-  there are a lot of systems in this space
-  the three that I know of are these
-  - most closely related work:
-    - adapton
-    - glimmer from the ember web framework
-    - build systems a la carte
+  Two of these are academic.
+  Adapton is an approach by Mathew Hammer.
+  Build Systems a la Carte is a paper by Simon Peyton Jones that explores the design space of incremental build systems and implements a flexible system in Haskell that has a similar basis to Salsa.
+  The main difference between Salsa and the system described in Build Systems a la Carte is that the latter allows one to customize many aspects.
+  Adapton as well is more flexible but also more complicated.
 
-  two of these are academic, adapton approach by mathew hammer and BSALC a paper by simon peyton jones that built a very
-  flexible system in haskell that has a similar basis
-  teh difference would be that ours is in between BSALC allows you to customize a lot of different thing and tweak many things, adapton is also a little more flexible but also more
-  complicated
+  Finally, an interesting approach is the Glimmer negine in the Ember web framework, which also does incremental updates.
+  Many web frameworks based on virtual DOMs and computing deltas to minimize changes to the actual DOM such as React and Elm are also related.
 
-  an interesting approach is glimmer engine in the ember web framework, which does incremental updates. i havent looked deeply at what react or elm does but i imagine they are kinda related
-
-  turns out this is a problem that applies to many areas, not just compilation
+  This problem applies to many areas, not just compilation, and the design is affected by the needs and constraints of each application area.
 
 # Salsa core idea
+
+  When writing a program in Salsa, it takes this approximate form consisting of a loop that sets some inputs and computes some derived values.
+  The inputs are for example the diffs the program receives from the editor.
+  The idea is that derived values are memoized, and inputs updated on change, such that whenever a derived values is queried, it will always be up to date.
 
   \begin{minted}{rust}
   let mut db = Database::new();
@@ -213,10 +224,12 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
   }
   \end{minted}
 
-  when you are writing a program in salsa it kinda looks like this and then you essentialy have a loop where you set some inputs, and that's like when you get a diff from the editor, and you compute some derived values
-  and the idea is that these things are memoized, so whenever you ask for a derived value it will always be up to date, for whatever the input changes you have made
-
 # Entity component System
+
+  In writing a whole compiler in this model, one of the things that arises is this relationship to a design pattern from game programming known as Entity Component Systems (ECS), which is presented as an alternative to Object-Oriented Programming.
+  In ECS, data and identity are separated.
+  In OOP, classes are defined and instantiated in such a way that the data and operations are associated with this class identity at the moment it is created, whereas in ECCS you can create a new identity with nothing associated except its identity, and then the data is attached to it separately from creation.
+  In games this is useful due to the dynamic nature of the data a game handles during runtime, allowing the data to be unstructured and easier to handle.
 
   - entity: unit of entity
   - component: data about an entity
@@ -229,22 +242,12 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
   }
   \end{minted}
 
-  \begin{Verbatim}
-  when you really try to write a whole compiler withj this kind of model one of the things that arises is this relationship to ECS, this is kind of a right turn but I want to explain this as a sort of background as a way to think about how this feels in practice
-
-  an ECS is something that arises from game proigramming and is an alternative to OOP
-
-  where you separate out data and the identity
-
-  so in an OOP you have a class and you make an instance of it and all of iots dasta and its operation are defined at that moment when you created it
-
-  whereas in an ECS you create a new entitty aND it has nothing associated with thi but identity, and then you can have separately data that you attache to it
-
-  in games this is useful because of the very dynamic nature of data in a game.
-
-  it allows you to be unstructured and in a compilar that part is not as importnat but its pretty useful
-
 # Entities in a compiler
+
+  In the context of compilers, this lack of structure is not as important, although useful.
+  The result of structuring data in a compiler in this fashion is a system in which entities correspond to things declared in the program language, on top of which different elements of data are layered, e.g. a symbol might have a type, a name, etc.
+
+  The reason it is useful to have the data layered on in this way is that it allows the system to be demand driven, by decoupling when an entity is created and when its associated data is computed: the compiler can be queried regarding the type of a symbol and can answer without requiring all the other data that might eventually become associated with it.
 
   - often called symbols
   - things like
@@ -255,21 +258,24 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
     - parameters or local variables
   - something "addressable" by other parts of the system
 
-  so what you wind iup with is a system where you entities correspond to things that get declared in the program language and you layer on different bits of data about this symbols so you might have a type, etc
-
-  and ther reason you layer this on is this is what allows us to be so demand driven
-
-  we can ask about the type of a symbol and get that without getting all the other bits of data that might eventually come to be associated with it
-
 # Components in a compiler
+
+  In the context of a compiler, there are a number of elements that might be represented as components, such as type, signature, errors, or the result of applying some analysis.
 
   things like
   - the type of an entity
   - the signature of a function
 
-  there are a couple different things that are like components, type is one, signature is another, sometimes there are more like unit results, or lists of errors, the result of applying some analysis that can reject
-
 # Salsa queries
+
+  Salsa's system is not quite an ECS in that it doesn't have a formal concept of entities.
+  Instead, the basic structure of a system written with salsa consists of named queries which are similar to components.
+  A query name might be something like 'type' or 'signature'.
+
+  In addition, there is a set of keys that go into the query, often just a single key.
+
+  When this query is executed it returns some result value.
+  The keys and values have to be plain values in the sense that they can be copied in memory and compared for equality.
 
   Q(K0 .. Kn) -> V
   - Q is the query name (like AST)
@@ -277,66 +283,66 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
     - atomic values of any type
   - The V is the value associated with the query
 
-  the basic structure of this salsa  systems is that you have queries, which have a name
-  its not quite an ECS in that we dont have a formal concept of entities, instead what we have is queries which are kind of like components
-  a query name might be like the type or the signature
-  and then we have a set of keys that go into the query
-  and often there is only one
-  so the type of a given funciton, or the type of a given variable,
-  but sometimes there are more than one, so there can be any number
-  and when yopu execute this query you get back some value that is the rssult of these things, the keys and the values have to be values in the saense they can be copied and can be compared for equality simple values
-
 # Example queries
 
+  Some examples of the kinds of queries that might be present:
+  - Base inputs, such as the input text / the source in a file.
+  - Derived values such as the AST or signature of a function.
+  - High level operations, such as a query returning the line and column position of the cursor in a file.
+  - The set of strings to display to the user as possible completions at the cursor's position.
+
+  ```
   input_text(FileName)
   ast(FileName) -> Ast
   signature(Entity) -> Signature
   completions(FileName, Line, Column) -> Vec<String>
-
-  some examples of the kinds of queries we might have
-  they range from
-  - base inputs, what is input text / the source in this file?
-  - derived things like the ast or a signature
-  - high level operations, the cursor is at this file, this line, this column,
-    what is the set of strings we want to display to the user aws possible
-    completions
+  ```
 
 # Query group
 
+  The program is thus structured into groups of queries, which provide an interface.
+  A database is declared which will provide the range of possible queries, some of which will be explciitly set as inputs and the rest as derived queries.
+
+  For example, the AST associated with a given file could be returned by a query names 'ast' which will take the filename and return the AST for the code contained in said file. This query will use the input query 'input_text', which will provide the contents of the file and track changes to the contents.
+
+  Note that queries may take different types of parameters, e.g. the signature of some entity in the system instead of a filename.
+
+  ```rust
   #[salsa::query_group]
   trait CompilerDatabase {
+
     #[salsa::input]
     fn input_text(&self, filename: FileName) -> String;
+
     fn ast(&self, filename: FileName) -> Ast;
+
     fn signature(&self, entity: Entity) -> FnSignature;
   }
+  ```
 
-  you wind up structuring your program into these groups of queries
-  you can think of it as a kind of interface
-  you declare that the database of data is going to have these range of
-  operations, some of them are inputs, these are the things you can explicitly set, and the rest are derived
-
-  so we might say what is the ast associated with the given file, and its going to give back an ast
-  so you see I can have different kinds of parameters at different points e.g. the signature of some entity in the system
-
-  why do I separate the inputs from the deriving functions?
-  it doesnt matter for the interfacem they both appear to be functions that you can invoke
-  but the actual implementation of this uses a procedural macro that generates some glue code and memoization code, and for inputs it generates different code than for derived queries, and it also generates a setter
+  Why are inputs separate from derived queries?
+  As far as the interface is concerned, they both appear as functions that can be invoked.
+  The actual implementation of Salsa uses a procedural macro to generate glue and memoization code, and for inputs different code is generated than for derived queries, as well as generating a 'set' function which will inform of changes and invoke invalidation.
 
 # Input queries
 
+  Input queries are essentially a field.
+  The `#[salsa::input]` annotation generates accessors.
+  Input queries essentially wrap a hashmap that stores the base data.
+  The framework will automaticall generate functions that can be used to get and set the value.
+
+  ```rust
   //  #[salsa::input]
   //  fn input_text(&self, filename: FileName) -> String;
   let text = db.input_text(filename);
   db.set_input_text(filename, text);
-
-  Input queries are essentially a field:
-      The #[salsa::input] annotation generates accessors
-
-  when you have the input queries, what you wind up with essentially is a kind of hashmap that storing your base data, and the framework will automatically generate a setter that you can use to set the value, and you can also just use it as a method to get the value
+  ```
 
 # Derived Queries
 
+  The derived queries are a little bit different.
+
+  ```rust
   // fn ast(&self, filename: FileName) -> Ast;
   fn ast(
     db: &impl CompilerDatabase,
@@ -345,36 +351,43 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
     let input_text = db.input_text(filename);
     ... /* implement parser here */ ...
   }
+  ```
 
-  Derived queries are defined by a function:
-      The db parameter is the database, gives access to other queries
-      Given keys, return results
+  Derived queries are defined as functions which given keys, return results.
+  The first 'db' parameter is the database and provides access to other queries.
+  This parameter is some unknown generic type which is constrained to implement the `CompilerDatabase` trait, such that the function can only  work with the methods exposed in that interface.
+  The other arguments are the inputs the query keeps.
 
-  the derived queries are a little bit different
-  for each one you give a function and this function takes a first argument
-  which is always the database, this is some type that implementes this trait or interface
-  this function only gets to work with the methods that are exposed in that interface, that's all it has access to
-  these other arguments are the inputs the qquriey keeps
+# Rustc History
 
-  one subtle but important thing is that in rust, if you have a top level function like this it has access to nothing else
-  you can make global mutable data if you really want to, its difficult
-  but basically it constrained in what it can access
+  One subtle but important issue is that in rust, a top level function such as this one has access to nothing else.
+  Global mutable data can be defined and used if truly necessary but is difficult to work with.
 
-  this is importnat because we went through a couple of iterations in our compiler
+  This is relevant because the rustc compiler team went through three iterations of this incremental system.
+  The first failed early and was never user-facing.
 
-  we did three incremental systems
-  one failed early
-  one we got to work but it didnt work really well, thats the one which wasnt as strict as this, since we though how hard can it be to make sure you dont access things you arent supposed to access?
+  The second was implemented and worked but with difficulty, as it was not as strict in this regard to global data.
+  The initial difficulty of ensuring proper access to data was underestimated,  that was not supposed to be accessed was not and led to difficult to debug errors.
+
   it turns out its really hard and there were many subtle leaks of information where we were using data that we thought it owuld be ok to read but it was influenced by earlier sessions of compilation, and we had a lot of bugs
   that version never made it to users
 
+  The system was
   we rewrote a third timne and took this much stricted approach
   when you implement something you really dont have access to anything that is not tracked in some way and that was much better
-  that is kind of like the equivalent of putting a typoe system onto your language
+  that is kind of like the equivalent of putting a type system onto your language
+
+  TODO: ask Niko about these systems. Is the second system the basis of the current incremental implementation in rustc, and the third Salsa? Or is Salsa
 
 # How salsa works
 
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+  ```rust
   db.ast("foo.rs")
+  ```
 
   Database contains:
       global revision counter
