@@ -13,6 +13,8 @@
 }
  -->
 
+TODO ask Niko: you talk about rustc but in fact most of the talk relates to rust-analyzer, correct?
+
 Many compiler textbooks and courses treat compilation as a "batch process", where the compiler takes in a bunch of input files, executes a suite of comiler passes, and ultimately produces object code as output.
 Increasingly, though, users expect integration with IDEs like VSCode, which requires a different structure.
 Moreover, many languages have recursive constructs where the correct processing order is difficult to determine statically.
@@ -355,7 +357,7 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
 
   Derived queries are defined as functions which given keys, return results.
   The first 'db' parameter is the database and provides access to other queries.
-  This parameter is some unknown generic type which is constrained to implement the `CompilerDatabase` trait, such that the function can only  work with the methods exposed in that interface.
+  This parameter is some unknown generic type which is constrained to implement the `CompilerDatabase` trait, such that the function only  has access to and can work with the methods exposed in that interface.
   The other arguments are the inputs the query keeps.
 
 # Rustc History
@@ -363,108 +365,91 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
   One subtle but important issue is that in rust, a top level function such as this one has access to nothing else.
   Global mutable data can be defined and used if truly necessary but is difficult to work with.
 
-  This is relevant because the rustc compiler team went through three iterations of this incremental system.
-  The first failed early and was never user-facing.
+  This is relevant because the rustc compiler team went through three iterations of this incremental system which differed among other things in in how access to data was handled.
 
-  The second was implemented and worked but with difficulty, as it was not as strict in this regard to global data.
-  The initial difficulty of ensuring proper access to data was underestimated,  that was not supposed to be accessed was not and led to difficult to debug errors.
+  The first attempty failed early.
 
-  it turns out its really hard and there were many subtle leaks of information where we were using data that we thought it owuld be ok to read but it was influenced by earlier sessions of compilation, and we had a lot of bugs
-  that version never made it to users
+  The second was implemented but did not work well, as it was not as strict in regard to access to global data.
+  The initial difficulty of ensuring proper access to data was underestimated, leading to difficult to debug errors.
+  Situations often arose caused by subtle leaks of information involving data that was thought to be usable but was in fact influenced by earlier phases of the compilation.
+  This version was never user-facing.
 
-  The system was
-  we rewrote a third timne and took this much stricted approach
-  when you implement something you really dont have access to anything that is not tracked in some way and that was much better
-  that is kind of like the equivalent of putting a type system onto your language
+  The system was rewritten a third time taking a much stricter approach such that feature implementations did not have access to anything that was not tracked.
 
-  TODO: ask Niko about these systems. Is the second system the basis of the current incremental implementation in rustc, and the third Salsa? Or is Salsa
+  TODO: ask Niko about elaborating on these earlier version, and what he meant with "that is kind of like the equivalent of putting a type system onto your language"
 
 # How salsa works
 
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+  Within a given revision, if the inputs or dependency queries do not change, the query system can be viewed as a memoization layer.
+  When one of the database query methods is invoked to compute some value it is memoized, and on subsequent invocations the query checks whether the result has already been computed and if so returns the stored value, otherwise it executes the function.
+  This process involves checking for dependency cycles.
+
+  This is what occurs within one revision, but the query system also tracks when a query invokes another to establish dependencies across revisions, such that if a memoized result changes the queries whose memoized results need to be invalidated can be determined.
+
+  The database contains:
+  - a global revision counter
+  - one map per query (e.g. ast)
+  - this maps query key to:
+    - Memoized result
+    - Vector of dependencies ([input_text("foo.rs")])
+    - Revision when last changed
 
   ```rust
   db.ast("foo.rs")
   ```
 
-  Database contains:
-      global revision counter
-      one map per query (e.g., ast)
-      maps query key to:
-          Memoized result
-          Vector of dependencies ([input_text("foo.rs")])
-          Revision when last changed
-
-  im going to dive a little bit into the actual implementation
-  the idea is when you invoke one of these methods to compute some value i mentioned earlier that its memoized
-  within a given revision, if you never change the inputs, you can think of it as a big memoization system
-  so you invoke one of these methods, we're going to look up if we've computed it before, and if so well just give yo uthe value and otherwise execute your function and give you the value when its done,
-  and were going to track looking for cycles while where doing that, because when we execute one function it might invoke other queries so then we can detect if there is some kind of cyclic dependenecy
-
-  that's what we do within one revision, but then across revisions we also track what the dependencies were, so when one thing executed another we can track that and use that to figure out what might have changed
-
-  the data we use to do this is basically a global revision counter, a map like
-  a hashmap for every query, and that maps the key to the value we need,
-  that's both the result, the vector of dependencies
-  and its a kind of revision that tracking in what version dis this last change
-
-  when you initially computed thats just the current revision but well see as we
-  go on that that's not always equal to the current revision
+  The data used to do is a global revision counter and a hashmap for every query which maps the key to the query result value, a vector of dependencies and a revision that tracks in which version the value last changed.
+  During the initial computation this revision is the current one, but as the query system runs it will not always be equal.
 
 # Recomputation (simplified)
 
-  When db.ast("foo.rs") is invoked:
+  When `db.ast("foo.rs")` is invoked:
 
-  If no entry yet, execute query and store result.
-  Otherwise, if any input dependency is out of date:
-      Re-execute ast function, recording new result + dependencies
-      Update the "last changed" revision
+  - If there is no entry yet, execute query and store result.
+  - Otherwise, if any input dependency is out of date:
+    - Re-execute the `ast` function, recording the new result and its dependencies
+    - Update the "last changed" revision
 
-# Recomputation
+  A simplified description of recomputation.
 
-  the basic idea, the simplest idea would be something like this
-  when you invoke a given query you can check if its out of scope, otherwise you
-  can walk those dependencies and see check if any of them have changed, what
-  did they transitively depend on, has it changed since the last revision, and
-  if so re execute
+  When a query is invoked and no entry is present in the hashmap, it is executd and its result stored.
+  Otherwise, the dependencies are walked and checked for changes, including their dependencies.
+  If any have changed since the last revision, they are reexecuted.
 
-  this is kind of like what make does if you think about it
-  if you think about make it has this dependency graph that it figures out then if some file if the timestamp is newer it's going to invalidate eagerly everything reachable from that function and recompute it (or from that file)
-  and recompute, re execute the compiler
+  This is similar to what make does for its targets.
+  Make as well establishes a dependency graph and determines whether the timestamp for any of the target files is newer.
+  If so, it eagerly invalidates everything reachable from that target and re executes the commands, or in the case of the compiler, the queries.
 
-  and this that's what what you would effectively get if you did it this way
+  This is the approach taken in the first version that was never released, since it does present some problems.
 
-  this is again something we tried the first time, in our first version that never made it out, and we'll see that it has some subproblems but it basically works
+  Example:
 
-  so can kind of give you an example of what might will happen here
+    Assume a query called signature, and that the current revision is R1.
 
     db.signature(..)
-
     Current revision: R1
-    db.signature(..) -- changed in R1
-    db.ast(..) -- changed in R1
-    db.input_text(..) -- changed in R2
 
-  if you are computing the signature of something and you're in revision one
-  let's say to compute the signature of a function
-  what we would have to figure out first
-  we have to go in and invoke DB.ast and that's going to give us the ast for the
-  function
-  and then when we have the AST
-  well to get the AST that
-  how do we get the AST
-  it has to parse the input that the function is in
-  and to parse the input we need the input
-  so we would presumably invoke DB input text
-  and at that point we get this is kind of the call stack right
-  at that point we get to actual input
-  so we can say we know what revision it's in
-  it's just whatever revision it was last set
-  and that gets propagated up
-  so at each point so it's effectively
+    To compute the signature the AST is required, so `db.ast(...)` is invoked.
+    To obtain the AST the input containing the function signature needs to be read and parsed, so `db.input_text(...)` is invoked.
+    At this point the following call stack has been built and the input text is reached:
 
+      db.signature(..)  -- changed in R1
+      db.ast(..)        -- changed in R1
+      db.input_text(..) -- changed in R1
+
+    The system knows the revision number, since it is the previously set one, and this revision value is propagated up.
+
+    Now assume a change is made and there is a new revision when the signature is once again requested.
+
+      Current revision: R2
+
+    The signature query once again checks its dependency on the ast query, which checks its dependency the input_text query, and since the input_text revision number is now R2, it is known that the ast is out of date since its revision number is older than its dependency, and must be recomputed.
+
+      db.signature(..)  -- changed in R1
+      db.ast(..)        -- changed in R1 ← out of date
+      db.input_text(..) -- changed in R2
+
+<!--
   QUESTION:
   the input.txt is effectively like the source in JavaScript
   you're saying like of an HTML Dom?
@@ -490,53 +475,53 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
   no it returns the whole file is what I'm saying but you might later extract
   out a slice or something
 
-  so now you know we we have this dependency information
-  so if we go to a new revision when we go to recompute the signature
-  we would notice that the ast is out of date
-  because it's revision is too is too old right
-  it has an input that is newer than then its revision and we would recompute it
-
-    Current revision: R2
-    db.signature(..) -- changed in R1
-    db.ast(..) -- changed in R1 ← out of date
-    db.input_text(..) -- changed in R2
+ -->
 
 # But suppose input change is not important
 
-  but what happens a lot with this system of course is that the actual change that you made doesn't really matter
-  so the simplest example is suppose I added a comment right into the function
+  A frequent case in this system is of course that the actual change in a dependency doesn't truly affect the value to be recomputed.
+  A simple example is adding a comment to a function body.
 
   Before:
 
+  ```rust
   // foo.rs
   fn foo() {
     do_something();
   }
+  ```
 
   After:
 
+  ```rust
   // foo.rs
   fn foo() {
     do_something(); // FIXME
   }
+  ```
 
-  now basically when we go back to our change
-  the actual ast that results is going to be the same either way
-  whether or not there's a comment in there
-  and so it's kind of silly then to re-execute all the things that depend on that ASD
+  The actual resulting AST is going to be the same, whether or not there is a comment, so recomputing it is not optimal.
 
 # Recomputation (less simplified)
 
-  so the actual algorithm that we use has this one one little twist to it
-  which says we execute the function but then check if the new result you got from re-executing is actually different and if it's not, you can just leave things the way they are, and otherwise you update
+  The algorithm used has an additional detail: when a query function is executed, the new result resulting from re-execution is then compared to the previous one to verify it is in fact different.
+  If it is the value is updated but otherwise the recomputation stops.
 
-  When db.ast("foo.rs") is invoked:
+  Example:
 
-  If no entry yet, execute query and store result.
-  If any input dependency is out of date:
-  Re-execute ast function, recording new result + dependencies
-  If the new result is different from old result:
-      Update the "last changed" revision
+  When `db.ast("foo.rs")` is invoked:
+
+  - If no entry yet, execute query and store result.
+  - If any input dependency is out of date:
+  - Re-execute ast function, recording new result + dependencies
+  - If the new result is different from old result:
+    - Update the "last changed" revision
+
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+  This is important since
 
   this is pretty important in the end for making things really work because
   if we apply this what will happen is we'll see that the ast is the same,
@@ -748,6 +733,8 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
 
   fn foo() {} // node "foo.rs".foo[0]
   fn foo() {} // node "foo.rs".foo[1]
+
+<<<<<<<<<<<<<<<<<<<<<<< HALF WAY MARK >>>>>>>>>>>>>>>>>>>>>>
 
 # Interning
 
