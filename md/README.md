@@ -150,9 +150,6 @@
 		- [2020 What I learned contributing to Rust-Analyzer ](https://dev.to/bnjjj/what-i-learned-contributing-to-rust-analyzer-4c7e)
 
 ---
-- https://github.com/rust-lang/rfcs/blob/master/text/1298-incremental-compilation.md
-
-- https://www.microsoft.com/en-us/research/publication/build-systems-la-carte/
 - https://petevilter.me/post/datalog-typechecking/
 
 - https://github.com/bytecodealliance/wasmtime/blob/ec87aee147cb0c8a8ae7b5db192daa2163207c8a/cranelift/docs/compare-llvm.md

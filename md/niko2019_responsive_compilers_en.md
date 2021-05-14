@@ -517,28 +517,22 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
   - If the new result is different from old result:
     - Update the "last changed" revision
 
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-  This is important since
-
-  this is pretty important in the end for making things really work because
-  if we apply this what will happen is we'll see that the ast is the same,
-  we won't update the revision in which we changed
-  so the AST is still considered to have changed in revision one and then the signature is not dirty and can be reused and those things are probably not that important but hopefully there's later computations
-  like like type checks and so on that actually are
-  the really convenient part about this is that you can sort of do this projection where you extract out the bits you actually needed and use that to constrain changes from propagating too far
+  This is important since when applying this, the system verifies that the AST is the same, and the revision in which it changed will not be updated.
+  Thus, the AST is still considered to have changed in the first revision and its signature is not dirty and can be reused.
+  In the case of the AST the impact is not that important but there are likely later computations such as type checks, etc that have a larger impact.
+  The convenience lies in that a projection can be made in which the parts that are actually needed can be extracted and used to contrain changes from propagating too far.
 
 <!-- SUBTLETIES -------------------------------------------------------------->
 
 # Order matters
 
-  some subtle points about this basic algorithm is that the first thing is that order matters a lot
-  when you're checking to see if something's out of date you actually have to check it in the same order that it executed in the first place or else you might be doing things that should never have happened
+  A subtle point about this basic algorithm is that the order of computations has a great impact.
+  When the compiler verifies that a datum is out of date, it has to be verified in the same order in which it was executed in the first place, or code that should never be executed might be triggered.
 
-  we have an example here where there's a function a that invokes a function B and then conditionally invokes either C or D depending on the result
+  Example:
+  Given a function `A` that invokes another function `B` and then either `C` or `D` depending on the result.
 
+  ```rust
   fn a(db: &impl Database) {
     if db.b() {
       db.c();
@@ -546,40 +540,48 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
       db.d();
     }
   }
+  ```
 
-  Input dependencies of a:
-      b, c, and d
-  If b were true in R1, we execute c
-  In R2, if b is false, c should never be executed
+  - The input dependencies of A are B, C, and D.
+  - If B were true in R1, we execute D
+  - In R2, if B is false, C should never be executed
 
-  if B is true then our list of dependencies in the first revision might be sort of A invoked B and invoked C because B was true
-  but in the second revision if we find out that B has changed, what we don't want to do is go check if C is up-to-date before we've checked B
-  because it may be that C should never have been invoked in the first place
-  if B has already changed we just have to stop and re-execute the function
-  because it could go through some other path
-  so you just have you have to keep that in mind
+  If B is true, then the list of dependencies in the first revision would be determined by the fact that A invoked B, and then invoked C because B was true.
+  In the second revision, it is not desireable to check if C is up-to-date before checking B if B has changed, since it might be the case that C should never have been invoked in the first place.
+  If B has already changed it must be re-executed since execution could go through some other path.
 
 # Minimizing redundant checks
 
-  For each memoized value, track:
-      "Last changed" revision
-      "Last checked" revision
-  Update "last checked" revision when value is updated
-  Ensures that we only execute a value once per revision
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-  the second part is we also track, we don't just check when did it last changed but we track when did we last check if it is when did we last update and check this value
+  A second subtle point is that not only must the system track when a value last changed but also when
+
+  the second part is we also track,
+  we don't just check when did it last changed
+  but we track
+    when did we last check if it is
+    when did we last update and check this value
+
+
+  - For each memoized value, track:
+    - "Last changed" revision
+    - "Last checked" revision
+  - Update "last checked" revision when value is updated
+  - Ensures that we only execute a value once per revision
 
   that basically ensures that we never recompute something more than once in a given revision
   so you know that at any point it's kind of linear over the set of things
 
 # Garbage collection
 
-  Memoized results from previous revisions may no longer be relevant
-  But GC can be quite efficient:
-      Execute "master query"
-      Sweep any value whose "last checked" revision was not updated
-  Key idea:
-      The master query doubles as the mark
+  - Memoized results from previous revisions may no longer be relevant
+  - But GC can be quite efficient:
+    - Execute "master query"
+    - Sweep any value whose "last checked" revision was not updated
+  - Key idea:
+    - The master query doubles as the mark
 
   finally, you do have to worry about garbage collection because if you think back to this ABC example like the first round the function A wound up invoking the function C and we memorize that but if in some later execution that function may never get invoked and we still have this memorized value kind of hanging around that we might want to (because we're thinking maybe we'll want to reuse it later) so that that requires you to collect these old results at some point
 
