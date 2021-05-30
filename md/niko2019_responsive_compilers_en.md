@@ -13,8 +13,6 @@
 }
  -->
 
-TODO ask Niko: you talk about rustc but in fact most of the talk relates to rust-analyzer, correct?
-
 Many compiler textbooks and courses treat compilation as a "batch process", where the compiler takes in a bunch of input files, executes a suite of comiler passes, and ultimately produces object code as output.
 Increasingly, though, users expect integration with IDEs like VSCode, which requires a different structure.
 Moreover, many languages have recursive constructs where the correct processing order is difficult to determine statically.
@@ -557,13 +555,15 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
   A second subtle point is that not only must the system track when a value last changed but also when
-
+  
   the second part is we also track,
   we don't just check when did it last changed
   but we track
     when did we last check if it is
     when did we last update and check this value
 
+  that basically ensures that we never recompute something more than once in a given revision
+  so you know that at any point it's kind of linear over the set of things
 
   - For each memoized value, track:
     - "Last changed" revision
@@ -571,8 +571,6 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
   - Update "last checked" revision when value is updated
   - Ensures that we only execute a value once per revision
 
-  that basically ensures that we never recompute something more than once in a given revision
-  so you know that at any point it's kind of linear over the set of things
 
 # Garbage collection
 
