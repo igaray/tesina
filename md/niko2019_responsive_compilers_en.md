@@ -550,29 +550,25 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
 
 # Minimizing redundant checks
 
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-  A second subtle point is that not only must the system track when a value last changed but also when
+  A second subtle point is that not only must the system track when a value last changed but also when it was last check that the value changed, i.e. when was it last updated and checked. 
   
-  the second part is we also track,
-  we don't just check when did it last changed
-  but we track
-    when did we last check if it is
-    when did we last update and check this value
-
-  that basically ensures that we never recompute something more than once in a given revision
-  so you know that at any point it's kind of linear over the set of things
-
   - For each memoized value, track:
     - "Last changed" revision
     - "Last checked" revision
   - Update "last checked" revision when value is updated
   - Ensures that we only execute a value once per revision
 
+  This ensures that the system never recomputes something more than once in a given revision.
+  <!-- 
+  so that at any point it's kind of linear over the set of things 
+  TODO: what does niko mean by this? 
+  -->
 
 # Garbage collection
+
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
   - Memoized results from previous revisions may no longer be relevant
   - But GC can be quite efficient:
