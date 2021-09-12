@@ -570,17 +570,34 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-  - Memoized results from previous revisions may no longer be relevant
+  finally, you do have to worry about garbage collection
+  in this ABC example
+
+  ```rust
+  fn a(db: &impl Database) {
+    if db.b() {
+      db.c();
+    } else {
+      db.d();
+    }
+  }
+  ```
+
+  The function A invokes the function C and we memoize its result.
+  In some later execution that function may never get invoked and this memoized value will persist since it may be reused later),
+  but this requires that these old results be collected at some point.
+  So memoized results from previous revisions may no longer be relevant.
+
+  It turns out you can do this in a kind of nice way, because we're already tracking for all the memorized values the revision when we last computed them (when they were last checked if they were up-to-date or not)
+
+
   - But GC can be quite efficient:
     - Execute "master query"
     - Sweep any value whose "last checked" revision was not updated
   - Key idea:
     - The master query doubles as the mark
 
-  finally, you do have to worry about garbage collection because if you think back to this ABC example like the first round the function A wound up invoking the function C and we memorize that but if in some later execution that function may never get invoked and we still have this memorized value kind of hanging around that we might want to (because we're thinking maybe we'll want to reuse it later) so that that requires you to collect these old results at some point
 
-  and it turns out you can do this in a kind of nice way
-  because we're already tracking for all the memorized values the revision when we last computed them (when they were last checked if they were up-to-date or not)
 
   and so essentially what you can do is: (let's say your master query whatever it is like type check all the functions) and then at the end of that you can just sweep through the memoized  values and say "did that wind up being recomputed in the most recent revision or not" and if it didn't then you know it's something that's no longer needed or at least was not needed
   to do that master query and you can throw it away

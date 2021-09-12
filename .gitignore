@@ -7,4 +7,5 @@
 *.out
 *.toc
 *.xml
-_minted-tesina/*
+latex/*.pdf
+latex/_minted-tesina/*
