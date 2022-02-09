@@ -13,7 +13,7 @@
 }
  -->
 
-Many compiler textbooks and courses treat compilation as a "batch process", where the compiler takes in a bunch of input files, executes a suite of comiler passes, and ultimately produces object code as output.
+Many compiler textbooks and courses treat compilation as a "batch process", where the compiler takes in a bunch of input files, executes a suite of compiler passes, and ultimately produces object code as output.
 Increasingly, though, users expect integration with IDEs like VSCode, which requires a different structure.
 Moreover, many languages have recursive constructs where the correct processing order is difficult to determine statically.
 Nicholas will discuss some of the work the Rust team has been doing on restructuring the compiler to support incremental compilation and IDE integration.
@@ -228,7 +228,7 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
 
   In writing a whole compiler in this model, one of the things that arises is this relationship to a design pattern from game programming known as Entity Component Systems (ECS), which is presented as an alternative to Object-Oriented Programming.
   In ECS, data and identity are separated.
-  In OOP, classes are defined and instantiated in such a way that the data and operations are associated with this class identity at the moment it is created, whereas in ECCS you can create a new identity with nothing associated except its identity, and then the data is attached to it separately from creation.
+  In OOP, classes are defined and instantiated in such a way that the data and operations are associated with this class identity at the moment it is created, whereas in ECS you can create a new identity with nothing associated except its identity, and then the data is attached to it separately from creation.
   In games this is useful due to the dynamic nature of the data a game handles during runtime, allowing the data to be unstructured and easier to handle.
 
   - entity: unit of entity
@@ -566,12 +566,9 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
 
 # Garbage collection
 
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+  Finally, you do have to worry about garbage collection.
 
-  finally, you do have to worry about garbage collection
-  in this ABC example
+  In this ABC example:
 
   ```rust
   fn a(db: &impl Database) {
@@ -583,13 +580,12 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
   }
   ```
 
-  The function A invokes the function C and we memoize its result.
-  In some later execution that function may never get invoked and this memoized value will persist since it may be reused later),
+  The function A invokes the function C and memoizes its result.
+  In some later execution that function may never get invoked and this memoized value will persist since it may be reused later,
   but this requires that these old results be collected at some point.
   So memoized results from previous revisions may no longer be relevant.
 
-  It turns out you can do this in a kind of nice way, because we're already tracking for all the memorized values the revision when we last computed them (when they were last checked if they were up-to-date or not)
-
+  It turns out you can do this conveniently, because all the memorized values are already tracking the revision when they were last computed (i.e. when they were last checked if they were up-to-date or not).
 
   - But GC can be quite efficient:
     - Execute "master query"
@@ -597,163 +593,144 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
   - Key idea:
     - The master query doubles as the mark
 
+  In essence the approach is to execute a given master query, e.g. type check all functions, and at the end of that process sweep through all the memoized values checking whether the value was recomputed in the most recent revision or not.
+  If it was not then it is certain that it was no longer needed, or not needed for that specific master query, and can be thrown away.
 
+  A beneficial guarantee is that since all values are pure functional values that are derived, if a value that is needed later is thrown away it can be recomputed.
 
-  and so essentially what you can do is: (let's say your master query whatever it is like type check all the functions) and then at the end of that you can just sweep through the memoized  values and say "did that wind up being recomputed in the most recent revision or not" and if it didn't then you know it's something that's no longer needed or at least was not needed
-  to do that master query and you can throw it away
-
-  and the nice part of this of course is these are all you know fully functional pure things that were derived so at the end of the day if you throw something away that you might want later it doesn't really matter because you can always recompute it
-
-  in fact we've been finding more and more that you know computation is cheap sometimes it's better to just throw away everything even if you know you're going to need it later because you might as well recompute it
-
-  so that's an interesting point of like let's say a place where we have been playing around with what the right strategy is
+  In fact in practice, given cheap computation it is often better to throw away values even if they will be needed later, since they can be recomputed and a better tradeoff between memory pressure and computation can be experimented with.
 
 # General idea
 
+  ```
   A --> C --> E --> F --> G
               ^
               |
   B --> D ----+---> H
-
-  Re-execute the "early steps"
-  But cut off as quickly as you can
-
-  when you're done you kind of get this picture where you have a graph of computation and what you really want to do is reexecute the early steps but cut it off as quickly as you can
+  ```
+  In short the process involved a graph of computation in which the early steps are re-executed but recomputation is off as quickly possible.
+  - Re-execute the "early steps"
+  - But cut off as quickly as you can
 
 <!-- LAYERING ---------------------------------------------------------------->
 
 # Layering
 
-  Common pattern:
-      produce a base structure
-      other queries "layer" structure on top
-  Example:
-      parser produces AST
-      name resolution resolves names to entities
-      type check adds types
+  - Common pattern:
+    - produce a base structure
+    - other queries "layer" structure on top
+  - Example:
+    - parser produces AST
+    - name resolution resolves names to entities
+    - type check adds types
 
-  when you're doing this approach one of the things you have to do is separate out
-  you know you don't want to have all the thing all the different bits of data that you're going to compute all packaged together into one data structure
+  An important requirement with this approach is to separate the computed values instead of packaging them in one data structure.
+  The ECS pattern mentioned before is relevant to this.
+  For example, in a compiler implementing a parser that produces an AST, there might be a class for the AST node which contains data representing name resolution results, type information, etc stored as fields in the node struct itself.
 
-  so I mentioned entity component systems and so on earlier, that's really relevant here because
-  let's say you have a parser that produces an ast
-  and a lot of compilers you might have like a class for the ast node and in that ast node it would have "oh when I named resolve this what did I resolve it to",  "what is the type of this ast node", sort of all stored as fields in the ast itself
-
-  but if you do that in this incremental system that won't work so well because when we reparse the ast we of course don't have those values anymore and you you'd have to sort of port them you just can't combine it
-
-  basically you can't reuse mix and match bits of data from different revisions that way,
+  In an incremental system this does not work as well since when the AST is reparsed those values may not exist, and validating what does or does not, or has been updated, is complicated.
+  In short, you cannot reuse fragments of data from different revisions.
 
 # Represent layers with maps
 
-  - Give each node in the AST a numeric id AstId
-  - Name resolution produces Map<AstId, Entity>
-  - Type-check produces Map<AstId, Type>
+  Instead, this layer is separated into essentially a collection of maps.
+  E.g. for the AST of a given function each node is given it's own numeric identifier and during name resolution a map is used that associates a node identifier with what it resolves to, i.e. the symbol or entity.
+  For type checking a similar map might be used, e.g. from identifiers to the type might be used.
+  This is reasonably efficient.
 
-  so what we do instead is to sort of separate out the layer and you wind up with essentially a lot of maps that's what it comes down to
-  so you could imagine for example that if you have the ast for a given function, you can give each node in the ast an ID
-
-  map just an integer
-  and then you can produce (for name resolution) you can have a map that says for the node with this ID here's what I resolved it - here's the symbol or entity
-  and for type checking you might have a similar map it says here's the type for that AST alright
-
-  and this works pretty well, it's reasonably efficient
+  - Give each node in the AST a numeric id `AstId`
+  - Name resolution produces `Map<AstId, Entity>`
+  - Type-check produces `Map<AstId, Type>`
 
 # Rust compiler of yore
 
-  - one big ast
-  - nodes in the assigned a pre-index (NodeId)
-  - this ID was used everywhere
+  In practice the way these identifiers are generated and assigned has a large impact.
+  In previous versions of the rust compiler, before the implementation of incremental compilation, sets of maps were used but because it was written in a functional style avoiding mutating values, and assigned these identifier to be used as map keys in a very simple manner: it walked the entire AST for the program and assigned numbers.
 
-  but it turns out that the way that you give these IDs actually matters a lot - and that was something (it's like a trick that keeps coming up)
-  and in the old rust compiler before we made it incremental also used a lot of maps
-  that's because it was written in a very functional style so it didn't want to be mutating things but it assigned the node IDs in a very simple way
-  it just did a walk of the entire ast for your whole program and gave them numbers
+  - One big AST
+  - Nodes in the map were assigned a sequential pre-index (NodeId), e.g. 0, 1, 2, 3
+  - This ID was used everywhere
 
+  E.g.
 
+  ```rust
   fn foo() { // node 0
     let x = 3; // node 1
   }
   fn bar() { // node 2
     let y = 4; // node 3
   }
+  ```
 
-  pre index of this walk so 0 1 2 3
-  this had a sort of downside
-  which is it was very simple but if I modify it
-  let's say the function foo
-  and add some more stuff into it
-  then all the IDs for the function bar are going to be different after that
-  so that there's this contamination
-  and that obviously won't work with an incremental system
-  or at least if you edit things early in the file you'll have to do a lot of work
-  recomputing stuff later on in the file and that's probably not what you wanted
+  This has a downside: if the function `foo` is modified, and more nodes in the AST are added, the indices for everything that comes after must change.
+  This side-effect contaminates computation so that an incremental system won't work; if code is changed early in the file more recomputation results than if the edit had been later.
 
 # Trees are your friends
 
+  A solution to this is to use a tree-structured identifier.
+  This technique is so useful it frequently arises.
+
+  Instead of simple integer identifiers for entities:
+  ```
   Entity = FileName
          | Entity "." Name [ Index ]
+  ```
 
-  so the the basic trick here is to use trees and this is one of those tricks where I feel like as we do the design we just keep coming across this this being a useful technique
-
-  so what you do is instead of giving instead of your ID being just a simple integer it's some kind of path right
-
+  an entity identifier becomes a path, independent of the context:
+  ```
   Entity = FileName
          | Entity "." Index
+  ```
 
+  These paths can be just a sequence of numeric indices or something richer, e.g. names.
+  The simplest scheme might be something like:
+
+  ```rust
   fn foo() { // node "foo.rs".0
     let x = 3; // node "foo.rs".0.0
   }
   fn bar() { // node "foo.rs".1
     let y = 4; // node "foo.rs".1.0
   }
+  ```
 
-  and this path it can be just in it it can just be indexes or it can be something richer with names it doesn't matter that much
-  but so this would be the simplest simple scheme
-  you might start it you might say the first step is a file name
-  and then every that that's the base kind of entity that can be in your system is a whole file
-  but then within that you can sort of nest right
-  so the function foo might be like represented as dot 0
-  and dot 1 would be the function bar and
-  then within there we have further numbers right
-  and now of course we have the advantage that changing the contents
-  of foo doesn't affect the numbers of bar in any way
+  in which the path starts with the file name since it is the base entity in which code is contained, and within that nested identifiers representing a path in the AST, such that `.0` identifiers the function `bar`, `.1` identifies the functioni `bar`, etc.
+  This has the advantage that changing the contents of `foo` does not affect the identifiers within the AST of `bar` in any way.
 
-  and what we actually do in the compiler is like a little bit different
-  so the main downside of this of this index scheme is if I add a new
-  function like if I put a function in between foo and bar now the the index of
-  bar has changed and so we'd have to recompute things about bar
-  and maybe that's a problem maybe it's not
-  like I said it turns out you know the computer is pretty fast like that might not be
-  actually that big a deal
-  but if you wanted to avoid it you can use names
+  The principal disadvantage of this simple scheme is that if a new function is put between the two existing ones, the index of bar will change, and it's node indices will have to be recomputed, so it's not as context-independent as could be.
+  This can be avoided by using non-sequential identifiers, such as names.
 
+  ```rust
   fn foo() { // node "foo.rs".foo[0]
     let x = 3; // node "foo.rs".foo[0].expr[0]
   }
   fn bar() { // node "foo.rs".bar[0]
     let y = 4; // node "foo.rs".bar[0].expr[0]
   }
+  ```
 
-  as long as we insert a new function in between, as long as it has a different name it's ok
+  In this approach if a new function is added, as long as it has a different name it will not collide.
+  The cost of this is added complexity in handling incorrect programs, and handling naming collisions.
 
-  the problem with names of course is then you have to deal with incorrect programs and or you might have two things with the same name which might or might not be correct but you have to deal with that possibility
+  The approach actually taken by rustc is slightly different, using names but giving them an extra index.
+  When the same name appears more than once the index is incremented.
+  This is usually an error, but allows parsing to continue and provide feedback, while still having a unique identifier.
+  In some cases it is not an error and reflects anonymous entities in the language syntax.
 
-  so we actually use in the compilers we have this extra index
-  so we use names but we give them an index and then when the same name appears more than once we increment the index and that's usually actually an error but we still need to keep going so that we can give you feedback but it lets us sort of have a unique ID
-  and sometimes it's not an error because there are certain things that are
-  anonymous for example
-  that works pretty well in practice
-
+  ```rust
   fn foo() {} // node "foo.rs".foo[0]
   fn foo() {} // node "foo.rs".foo[1]
+  ````
 
 <<<<<<<<<<<<<<<<<<<<<<< HALF WAY MARK >>>>>>>>>>>>>>>>>>>>>>
 
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 # Interning
 
-  struct Entity {
-    value: u32
-  }
+
 
   so you have these big trees and that that's great but you have to actually pass them
   around and so forth
@@ -766,10 +743,18 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
 
   and then this is the actual data which is recursive but it goes through the interning system right
 
+  ```rust
+  struct Entity {
+    value: u32
+  }
+  ```
+
+  ```rust
   enum EntityData {
     Root(FileName),
     Child(Entity),
   }
+  ```
 
   so the recursive step references the previously interned value
   and then we have a special interning mechanism that can convert the data into a new one

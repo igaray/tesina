@@ -9,6 +9,32 @@ https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html
 
 # Pipelines y Pasadas (niko2019respcomp)
 
+  When I started writing compilers we used the Dragon Book as a reference, which teaches this classic structure of how to write a compiler in passes.
+  The way compilers usually work is this batch compilation model, in which one runs the compiler, process the whole source and produce an output and maybe gets an error out of it.
+
+  Traditional compiler model is a series of passes:
+  - lex(source) -> tokens
+  - parse(tokens) -> ast
+  - semantic_analysis(ast), type_check(ast)
+  - loop: apply optimizations
+  - etc
+
+  That is precisely how `rustc`, the Rust compiler, was written in the beginning, and still looks like today in some ways, since the effort to move away from this architecture is ongoing.
+
+  The reason that there has been a change is that the way one interacts with compilers has changed.
+  These days people work with IDEs and want a different way to interact with the source in this model.
+  It's necessary to accept erroneous inputs and make sense of them, perform source code completions, and jump to definitions in an interactive way, and to do this one needs to process just enough to answer the user's query.
+
+  What if the Dragon Book were written today?
+
+  There seem to be more questions than answers, not everything needed to make the book has been written down, but the rustc implementation community has a lot of experiences of what they tried and the challenges that come with those experiences.
+
+  The first thing to learn about this environment today is that there has been a big shift during the last couple of years in how IDEs are written. Microsoft introduced VS Code, which is an amazing editor, but among the many amazing things it introduced is the LSP (Language Server Protocol), which is an intermediate protocol for interfacing between the language that's being compiled and the editor that is interacting, so that neither have to be tied to each other.
+
+  It used to be the case that when you wrote, e.g. an Eclipse plugin for your language, it just worked in Eclipse and if you wanted to provide the same extension for Netbeans, Emacs, Vim, etc you would have to rewrite most of the plugin. LSP lets you sidestep that.
+
+  As an example in the Rust community we have a language service which works for Emacs, Vim, or any editor or IDE which supports the LSP.
+
 # The "responsive" compiler (niko2019respcomp)
 
 # Demand driven (niko2019respcomp)
