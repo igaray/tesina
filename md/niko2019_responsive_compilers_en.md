@@ -447,8 +447,7 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
       db.ast(..)        -- changed in R1 ← out of date
       db.input_text(..) -- changed in R2
 
-<!--
-  QUESTION:
+<!-- QUESTION:
   the input.txt is effectively like the source in JavaScript
   you're saying like of an HTML Dom?
   yeah it's kind of like that
@@ -722,26 +721,13 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
   fn foo() {} // node "foo.rs".foo[1]
   ````
 
-<<<<<<<<<<<<<<<<<<<<<<< HALF WAY MARK >>>>>>>>>>>>>>>>>>>>>>
-
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< HALF WAY MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 # Interning
 
-
-
-  so you have these big trees and that that's great but you have to actually pass them
-  around and so forth
-  and if you had like a garbage collected language I guess that's not such a big deal you can sort of allocate them
-  but you probably do wind up creating a lot of the same tree over and over
-  so what we do is we have also the last piece of this system is a kind of interning mechanism
-  it's basically there to turn these big trees into little integers and go back and forth
-  and so you can reference this integer, you basically intern
-  the way you'd represented it in rust is that the whole path is represented as an integer (a new typed integer so it has a struct that wraps it around it so that we can give it a meaningful type)
-
-  and then this is the actual data which is recursive but it goes through the interning system right
+  An issue with these large tree-like data structures is that they need to be used and passed around.
+  In a garbage collected language they can be allocated and forgotten but they are created repeatedly, very frequently. 
+  In the case of the Rust compiler, they are subject to an interning mechanism, which turns the tree into an integer wrapped in a new struct type to give it a meaningful type, and the integer is used to reference the full path:
 
   ```rust
   struct Entity {
@@ -749,6 +735,8 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
   }
   ```
 
+  The actual data is recursive but it does go through the interning system:
+
   ```rust
   enum EntityData {
     Root(FileName),
@@ -756,104 +744,82 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
   }
   ```
 
-  so the recursive step references the previously interned value
-  and then we have a special interning mechanism that can convert the data into a new one
+  The recursive step references the previously interned value, and includes a mechanism with can convert data into a new entity identifier.
+  These dependencies can be tracked so that if some function is renamed or contents modified the references are updated.  
 
+  ```rust
   #[salsa::query_group]
   trait CompilerData {
+
     #[salsa::intern]
     fn intern_entity(&self, data: EntityData) -> Entity;
   }
-
-  and we can actually track those dependencies too
-  and thus if for example some function is renamed or parts of the system are different we'll figure it out but
+  ```
 
 # Tree-based entities also give context
 
+  Another advantage of this entity-based approach with tree-shaped identifiers is that frequently context is always present, in the identifier itself.
+
+  ```rust
   enum EntityData {
     Root(FileName),
     Child(Entity),
   }
-
-  the other advantage of this this entity based approach or this this tree based identifier our approach is that you get some context
-  because it turns out you you often really need this kind of context
-
-  so if you think about some of the examples I gave earlier
-  when you're computing the signature of a given entity I sort of hand-wove and said something like "to compute the signature of a function we have to look at the ast of that function" but then I said that there's only one ast per file
-  the question would be how do I get from this function to that file,
-  how do I know what file the function is in right in the first place
-
-  and there are different ways to do it but one way that works really well if you have this tree based approach is that it's it's right there in the identifier basically
-  you can walk up the ID and find the root of it is some file and you can you can get the file from there
+  ```
 
 # Signature
 
   Example from earlier:
 
-      db.signature(entity)
-      db.ast(file_name)
-      db.input_text(file_name)
+  ```rust
+  db.signature(entity)
+  db.ast(file_name)
+  db.input_text(file_name)
+  ```
 
   How do we get the file_name from the entity?
 
-  so the the other big technique that comes up a lot is the ability to tighten your queries
-  so far what we have is this the system that lets you write a bunch of queries, it tracks their dependencies
-  the nice part about is it's guaranteed to sort of be correct
-  it'll only recompute or it will always give you a refreshed value
-  but it might actually do a lot of recomputation if your queries are very broad
+  E.g. when computing the signature of a given entity, the previous explanation was vague in some details: "to compute the signature of a function the AST of that function must be computed", but later one we established that there's only one AST per file.
+  The question arises how is the file obtained from that function, i.e., how is the file in which the function is contained known in the first place?
+  There are several possibilities but when using the tree-based identifiers, it is included in the identifier itself: the identifier can be walked up to find the root and the filename obtained.
 
 # Tightening queries with projection
 
-  db.signature(entity) -- signature of a function
-  db.ast(file_name) -- ast of the entire file
+  Another technique whose application often arises is the ability to tighten your queries.
+  So far this system allows writing a set of queries which track their dependencies, and is guaranteed to be correct in that it will always give you a refreshed and not stale value, but it might actually do a lot of recomputation if your queries are very broad.
 
-  and this particular query setup that I showed here is an example where it might
-  be too broad in practice you have to try it and see
-  because that's what you're gonna find wind up doing here is recomputing the signature of the function whenever anything in the file changes
-  because this ast is for the entire file
-  and that's maybe that's okay or maybe it's not alright
-  and what what you can do if you find that your recomputing something too often is you can insert a sort of intermediate query to do a projection or a narrowing or some sort of transformation all right
-  so maybe I have a query that says give me the ast just for this one function and all that does is find the function and pull it out from the bigger ast
-  but the advantage of this is that if the bigger ast changes all I have to re-execute is the code that finds and extracts the one smaller piece of AST and I won't have to do any of the dependent operations
+  E.g. this particular query setup is an example where it might be too broad in practice:
 
-  db.signature(entity)
-  db.entity_ast(entity) -- extract AST of a single entity
-  db.ast(file_name)
+  - db.signature(entity) -- signature of a **function**
+  - db.ast(file_name) -- AST of the **entire file**
 
-  so that that kind of is basically just a handy thing where you can do while you're looking, while you're optimizing
+  These two queries will result in recomputing the signature of the function whenever anything in the file changes, since the AST is for the the entire file. Whether this is a problem or not depends on more context, but when the query system is recomputing an entity's value too often, an intermediate query can be inserted to perform a projection or narrowing, such that query would give the AST of a single function, which will look up the function and pull out the subtree out of the larger AST. 
+  The advantage of this is that if the larger AST changes, only the code that finds and extracts the smaller AST has to be recomputed and not all the dependent operations. 
 
-  QUESTION how many queries are there in the rust compiler?
+  - db.signature(entity)
+  - db.entity_ast(entity) -- extract AST of a **single** entity
+  - db.ast(file_name)
 
-  I don't know there's a lot probably not thousands it's probably more that's probably hundreds
+# QUESTION: how many queries are there in the rust compiler?
 
-  one of the things the rust compiler is actually using a slightly different version of this system
-  so this is like an idealized version of the rust compiler that has been extracted to a library and we are actually using it in a separate effort to build an IDE like an IDE first compiler for rust
-  that we have to figure out how to bridge the two
+  I don't know, there's a lot. 
+  Probably not thousands, probably hundreds.
 
-  that's another story but
-  that is using this framework and I'm not sure how many queries they have
-  but they're not complete yet
-  the rust framework is using a slightly different one
-  but in any case I think it's has on the order of hundreds
+  The rust uses a different version of this system. 
+  This is an idealized verson that has been extracted from the rust compiler into a framework library, that is being used in a spearte efforte to build an IDE-first compiler for rust. 
 
-  but the reason I mentioned that we're not using it
-  is one of the problems we had in the rust compiler is that we didn't support any
-  kind of modules and the number of queries did indeed grow very large and it's just annoying if nothing else but also hard to read the source because they're all in like one huge list
+  One of the problems that arose in the rust compiler is that the query system didn't support any kind of modules, and the number of queries did indeed grow very large, making it very difficult to read the source because all the queries are in one large list. 
+  Part of the reason that everything is done by interfaces and so on is exactly so that you can modularize the queries and separate the functionality for the parser, the type checker, declare their dependencies, and so on.
 
-  and so part of the reason that everything is by interfaces and so on is exactly so that you can modularize the queries and say here's the stuff for the parser and here's the type checker and they depend on one another and so on
-
-  but it does it does grow quite large I would say
+<!-- ERRORS ------------------------------------------------------------------>
 
 # The "outer spine"
 
-  so one of the questions I think what when I've been working with this system it seems very clear when you look at any individual function how it's supposed to work and it's kind of clear when you think about at the outer level okay I'm gonna make a query like get me the completions
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+  When working with this system it seems very clear when you look at any individual function how it's supposed to work and it's kind of clear when you think about at the outer level okay I'm gonna make a query like get me the completions
 
   but getting from give me the completions at this point to those intermediate queries that actually know what entities there are and can think about the type checking and all that stuff it's kind of challenging
-
-  it's like a quantum mechanics thing or something it all makes sense at the two extremes but the middle is confusing
-
-  so I thought it would be useful to just sort of walk over this this spine how it all connects
-  this is an example how you might do it
 
   Question: How do we get "all the errors in the project"?
 
@@ -901,8 +867,6 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
   we only keep the values we sort of selectively keep what what data to keep and what not to keep and
 
   that kind of tuning is I think it's sort of annoying that it's necessary but if you have this framework it's or have a framework it's nice that you can you can do it relatively easily
-
-<!-- ERRORS ------------------------------------------------------------------>
 
 # Error handling
 
@@ -961,11 +925,13 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
 
   so this might be an example of you know just basically whenever you make something that represents a type or whatever just include an error in there
 
+  ```rust
   enum Type {
     Integer,
     Character,
     Error,
   }
+  ```
 
   so now you can have integer character or error and propagated along
 
@@ -978,10 +944,12 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
 
   so if we have like this structure that stores the signature of a method it says here's the argument types
 
+  ```rust
   struct MethodSignature {
     argument_types: Vec<Type>,
     return_type: Type,
   }
+  ```
 
   Hidden assumption here?
 
