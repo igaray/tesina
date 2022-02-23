@@ -720,7 +720,7 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
   ```rust
   fn foo() {} // node "foo.rs".foo[0]
   fn foo() {} // node "foo.rs".foo[1]
-  ````
+  ```
 
 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< HALF WAY MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
@@ -812,98 +812,89 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
   One of the problems that arose in the rust compiler is that the query system didn't support any kind of modules, and the number of queries did indeed grow very large, making it very difficult to read the source because all the queries are in one large list. 
   Part of the reason that everything is done by interfaces and so on is exactly so that you can modularize the queries and separate the functionality for the parser, the type checker, declare their dependencies, and so on.
 
-<!-- ERRORS ------------------------------------------------------------------>
-
 # The "outer spine"
 
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+  When working with this system and looking at any individual function it's intent and functioning seem very clear, as is when examining the outer level or top-level queries, e.g. a query to obtain all completions at a cursor point, but getting from "give me the completions at this point" to those intermediate queries that know which entities are active and can type check, etc is challenging. 
 
-  When working with this system it seems very clear when you look at any individual function how it's supposed to work and it's kind of clear when you think about at the outer level okay I'm gonna make a query like get me the completions
+  Another motivating example is a query to obtain all errors in the project, which is a query likely to be used by an IDE. 
+  This is an example of how it might be implemented:
 
-  but getting from give me the completions at this point to those intermediate queries that actually know what entities there are and can think about the type checking and all that stuff it's kind of challenging
+  - `db.all_errors()`
+    - `db.filenames()` -- get a list of all filenames
+    - `db.entities(filename)` -- for each filename, get all entities
+      - `db.parse(filename)` -- parse file to AST
+    - `db.type_check(entity)` -- for each entity, do type-check
+      - `db.ast(entity)` -- get the AST for this entity
+        - `db.parse(filename)` -- parse file to AST (memoized)
 
-  Question: How do we get "all the errors in the project"?
+  It might start by finding all file names in the project, which is probably a base input.
+  It can then iterate over each file and query for all the entities, for which it would have to parse the file to provide an AST and then walk the AST and extract, just the identifiers of the entities, and return this collection.
+  After which the entities can be iterated over and type checked. 
+  At this point it becomes clear that this becomes standard for many queries, since it provides all elements needed, although some steps have been left out e.g. name resolution results, etc which all fit into this framework.
 
-  db.all_errors()
-  db.filenames() -- get a list of all filenames
-  db.entities(filename) -- for each filename, get all entities
-      db.parse(filename) -- parse file to AST
-  db.type_check(entity) -- for each entity, do type-check
-      db.ast(entity) -- get the AST for this entity
-          db.parse(filename) -- parse file to AST (memoized)
-
-  so if you were say computing what are all the errors in the project
-  that's that's like that's kind of a query you would likely have for your IDE
-  you might start by saying give me all the file names in the project right
-  and that's probably just a base input
-  and then you can kind of iterate over each file and have something that says "give me all the entities" which would go through which would have to parse the ast and then walk the ast and extract, just the IDS and return them to you
-  all right and then you can walk through and type check all the entities
-  and by this point once you're in this this round of like getting the ast for a given entity and so on and it becomes again fairly clear this is like your standard code
-  because now you have the identify as you need for all the things
-  but the I left out some steps here for sure like type checking would probably have to get the ast but it would also need to get the name resolution results and things like that but they fit into this framework
-
-  all right and so having this now we can sort of walk through and see what happens in this complete picture
+  Having this, we can walk through and see what happens in a given situation. 
 
   - What if the user edits a comment?
-  - Reparse, but that's it.
+    - Reparse, but that's it.
+
+  If the user edits a comment, the solution might be as simple as examining the current revision which holds the memoized data, re-walk the entities and re-run the parser. 
+  Once the parser has run, the resulting AST is the same, so the process can stop, and all type checks are kept intact. 
 
   - What if the user edits a fn body?
-  - Reparse the file.
-  - Extract the AST.
-  - Type-check the function that changed.
+    - Reparse the file.
+    - Extract the AST.
+    - Type-check the function that changed.
 
-  if the user edits a comment
-  and the answer might be as simple as "well we've done one revision so we have all this memoized data"
-  and if the user edits a comment we can ReWalk it and we see that we have to rerun the parser but once we rerun the parser the ast that results is the same so we just stop
-  and we can keep all the type checks intact
-  but if the user edits a single function body then we would have to rerun the parser they would not be the same because they did actually edit a function body so the ast is different, so in that case we would have to as we're doing the type checking for each we would extract out one by one what is the AST for any given function and we'll find that only one of them has changed
-  so we'll wind up we running the type checker but just for that one function
-  and so we wind up we doing a pretty reasonably minimal amount of work overall
+  If the user edits a single function body the parser must be re-run. 
+  In this case the resulting AST is not the same and type-checking must be also done again, but in the process of extracting the AST for every function in the file, we'll find only one has changed. The type-checker will be re-executed but only for that one function, so that a reasonably minimal amount of work is done overall.
 
-  there was a question of how many queries there are in the compiler and I mentioned memory use, so one of the things I would add is that in practice you may not actually want to keep all of this memoized data around for all of your queries because it can be quite a large graph
-  but there's a lot of different tricks you can do
-  one of the things we do and the compiler is we only keep the hash actually we don't keep the full value so we can still re-execute and we can still see if it has changed because it's a cryptographic hash so it's at least as good as sha-1 or whatever
+  In practice, one may not want to keep all the memoized data in memory for all of the queries, since the amount of data can be quite large (on the order of gigabytes for large programs).
+  TODO: get data from matklad for this. 
 
-  we know if it's changed but if we have to recompute it then we'll just redo the work because it's not worth it
-  we only keep the values we sort of selectively keep what what data to keep and what not to keep and
+  There are some mitigations that can be applied.
+  In rustc, in some cases, only a hash is stored, instead of the full return value. 
+  We can use the hash to check whether the value has changed and only if necessary re-execute. 
+  If it is necessary to recompute, the work will have to be re-done because in many cases it is not worthwhile to store. 
+  The compiler selectively keeps values depending on whether they are cheap to compute or store .
+  This kind of performance tuning is annoying and but necessary, and if incorporated into the framework it can be done relatively easy. 
 
-  that kind of tuning is I think it's sort of annoying that it's necessary but if you have this framework it's or have a framework it's nice that you can you can do it relatively easily
+<!-- ERRORS ------------------------------------------------------------------>
 
 # Error handling
 
-  now I want to talk about a few other sort of things that happen in practice one of them is error handling
-
-  I mentioned somewhere along the line that we if you have errors you you know you might like to
-  I'll give you have two functions with the same name we want to have to handle that case and I think that in general especially if you're in an IDE context you really want to be handling, you really don't want to stop compilation basically ever
+  In general, but especially in the context of an IDE, the compilation should not stop, even in the presence of errors, e.g. two functions with the same name. 
+  Many early compilers handled errors by just stopping and reporting.
 
   How not to handle an error in a compiler:
 
+  ```cpp
   throw new TypeError();
+  ```
 
-  a lot of early compilers I think will basically handle an error by just saying well okay something's wrong I give up I'm done and that's that's a reasonably easy approach, it's probably okay for for many projects
+  It's an easy approach and correct for many projects, but it's very difficult to recover, once this strategy is baked into the compiler it's much harder to get it out. 
 
-  but it's actually but it's it's really difficult to sort of recover once you've
-  baked this strategy into your compiler it's much hard to get it out again
+  The rustc compiler had this strategy and a slow ongoing process has been removing it, with much difficulty.
 
-  and the rustc compiler had this strategy for sure for awhile and we've been slowly
-  getting rid of it and it's been very difficult
-
-  the next thing that I think you people often try to do which the Rust compiler also tries to do is to say well there's an error I'll report the error and then I'm gonna give back some value that's like reasonable, it has the right type, but for the compilers type but it's not the right value
-  so it might be like I need to compute the type of this expression, this expression is bogus I'll just give back the type integer and say "yeah good enough"
+  The second approach many implementations attempt, including rustc, is to report an error on encountering it, and return some reasonable value with e.g. the correct type, but a different value. 
+  E.g. when computing the type of an incorrectly defined expression, return a value of type integer and call it good enough. 
 
   Another way not to handle errors:
 
+  ```rust
   if (some kind of error) {
     return fake_but_otherwise_legal_value;
   }
+  ```
 
-  maybe they'll get some other errors down the line but the user can figure it out and that kind of works sometimes but it does lead to some really confusing errors to a user where suddenly the compiler is talking about the type integer and you have no idea why
+  There may be some other errors down the line but the user can figure out where it originated. 
+  This works in many scenarios but can lead to very confusing errors. 
+  The compiler is suddenly talking about something of type integer and you have no idea why. 
 
 # Recovery from day one
 
-  and what you can do instead that's actually not a lot harder and much nicer
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-  so a better idea is to introduce some kind of Sentinel values that say "this is bogus" basically, this is an erroneous expression a bad parse whatever and then you can just return this value
+  What can be done instead, which is not a lot harder and much nicer, is to introduce some kind of sentinel value that indicates an error, but also be returned and allow the compilation process to continue. 
 
   - Create a sentinel value that means "bad user code here"
   - Invariant:
@@ -911,16 +902,16 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
       - So you can feel free to suppress downstream errors
   - No such thing as a "fallible" compiler operation
 
-  it's not that much more work because as long as you just have them there then it's like almost as easy as throwing to just return this sentinel value
+  This is not much more work, as long as the invariant is maintained.
+  Returning the sentinel value is as easy as throwing, and the sentinel values are usually very easy to propagate because it is certain that if any value of the sentinel kind is encountered, an error has been reported and you can short-circuit all remaining computation, continuing to propagate larger and larger sentinel values up the line. 
 
-  they're usually very easy to propagate because you know by that if you ever see that sentinel value and you know that an error has been reported so you can just kind of short-circuit all the other computation and just keep propagating bigger and bigger sentinels up the line
-  and so you wind up with a notion where basically in compilers there is no such thing as a fallible operation
-  it always succeeds but it might produce an error value
+  The end result is a situation in which there is no such thing as a fallible computation in the compiler, it always succeeds but may produce an error value. 
 
-  this invariant is pretty important though
-  I've seen subtle bugs introduced where people return the sentinel value but they haven't actually reported an error
-  usually because they think they know that an error will be reported by some other phase in the compiler but then because they are (they're not wrong about that but they're wrong about the ordering) and the phase actually comes later and the phase winds up being skipped because we saw this error value and we thought that there already was an error so we don't want to report duplicate errors
-  so you really want to keep this invariant very clear that you know you actually reported the error there then you can produce a sentinel value or you got one from somebody else and then it will work much better
+  The invariant is very important however. 
+
+  There have been subtle bugs introduced when the sentinel value is returned but the error has not been actually reported, usually because the error is expected to be reported by some other, later phase in the compiler and that phase ends up being skipped because of the error sentinel. 
+  The phase is skipped because it is known an error was already encountered, and we want to avoid reporting errors in duplicate.
+  The invariant of reporting errors where and when they occur and only producing sentinel values after the report makes it clear that later, if you receive a sentinel, reporting is not necessary. 
 
 # Example: error type
 
