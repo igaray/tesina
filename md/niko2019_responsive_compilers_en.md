@@ -17,6 +17,7 @@ Many compiler textbooks and courses treat compilation as a "batch process", wher
 Increasingly, though, users expect integration with IDEs like VSCode, which requires a different structure.
 Moreover, many languages have recursive constructs where the correct processing order is difficult to determine statically.
 Nicholas will discuss some of the work the Rust team has been doing on restructuring the compiler to support incremental compilation and IDE integration.
+`\cite{niko2019responsive}`
 
 - [Slides](https://nikomatsakis.github.io/pliss-2019/responsive-compilers.html)
 
