@@ -1,10 +1,3 @@
-@online{hejlsberg_modern_compiler_construction,
-    author = "Anders Hejlsberg",
-    title = "Anders Hejlsberg on Modern Compiler Construction",
-    url  = "https://www.youtube.com/watch?v=wSdV1M7n4gQ",
-    keywords = "general"
-}
-
 @online{wiki_incremental_compiler,
     author = "Wikipedia",
     title = "Incremental Compiler",
@@ -26,58 +19,40 @@
     keywords = "lsp"
 }
 
-@online{olle_query_based,
-    author = "Query-based compiler architectures",
-    title = "Olle Fredriksson",
-    url  = "https://ollef.github.io/blog/posts/query-based-compilers.html",
-    year = {2020},
+@online{brandon2021opinionated,
+    author = "Jamie Brandon",
+    title = "An opinionated map of incremental and streaming systems",
+    url = "https://www.scattered-thoughts.net/writing/an-opinionated-map-of-incremental-and-streaming-systems",
+    year = {2021},
+    month = {04},
+    keywords = "incremental",
+}
+
+@online{mhammer2014pldi,
+    author = "Matthew Hammer",
+    title = "ADAPTON: Composable, Demand-Driven Incremental Computation",
+    url = "http://matthewhammer.org/adapton/adapton-pldi2014.pdf",
+    year = {2014},
     month = {06},
-    keywords = "general,incremental,querybased"
+    keywords = "incremental",
 }
 
-@online{rust_blog_incremental_compilation,
-    author = "Michael Woerister",
-    title = "Rust Blog: Incremental Compilation",
-    url  = "https://blog.rust-lang.org/2016/09/08/incremental.html",
-    year = {2016},
-    month = {09},
-    keywords = "incremental"
-}
-
-@online{dunbar2016,
-    author = "Daniel Dunbar",
-    title = "2016 LLVM Developers’ Meeting: A New Architecture for Building Software",
-    url = "https://www.youtube.com/watch?v=b_T-eCToX1I",
-    year = {2016},
+@online{mhammer2019adaptonrust,
+    author = "Matthew Hammer",
+    title = "Github: adapton.rust",
+    url = "https://github.com/adapton/adapton.rust",
+    year = {2019},
     month = {12},
-    keywords = "buildsystems",
+    keywords = "incremental",
 }
 
-@online{niko2019responsive,
-    author = "Nicholas Matsakis",
-    title = "Youtube: Responsive compilers - Nicholas Matsakis - PLISS 2019",
-    url = "https://www.youtube.com/watch?v=N6b44kMS6OM",
+@online{mhammer2019adaptonprogrammingmodel,
+    author = "Matthew Hammer",
+    title = "Docs.rs: Adapton programing model",
+    url = "https://docs.rs/adapton/0.3.31/adapton/#programming-model",
     year = {2019},
-    month = {06},
-    keywords = "rustc,incremental",
-}
-
-@online{niko2019salsaworks,
-    author = "Nicholas Matsakis",
-    title = "Youtube: How Salsa Works (2019.01)",
-    url = "https://www.youtube.com/watch?v=_muY4HjSqVw",
-    year = {2019},
-    month = {01},
-    keywords = "salsa",
-}
-
-@online{niko2019salsadepth,
-    author = "Nicholas Matsakis",
-    title = "Youtube: Salsa In More Depth (2019.01)",
-    url = "https://www.youtube.com/watch?v=i_IhACacPRY",
-    year = {2019},
-    month = {01},
-    keywords = "salsa",
+    month = {12},
+    keywords = "incremental",
 }
 
 @InProceedings{mokhov2018build,
@@ -104,6 +79,31 @@
     publisher = {ACM},
     url = {https://www.microsoft.com/en-us/research/publication/build-systems-la-carte/},
     keywords = "buildsystems",
+}
+
+@online{dunbar2016,
+    author = "Daniel Dunbar",
+    title = "2016 LLVM Developers’ Meeting: A New Architecture for Building Software",
+    url = "https://www.youtube.com/watch?v=b_T-eCToX1I",
+    year = {2016},
+    month = {12},
+    keywords = "buildsystems",
+}
+
+@online{levien2020journey,
+    author = "Raph Levien",
+    title = "Youtube: A journey through incremental computation - Raph Levien",
+    url = "https://www.youtube.com/watch?v=DSuX-LIAU-I",
+    year = {2020},
+    month = {12},
+    keywords = "incremental",
+}
+
+@online{hejlsberg_modern_compiler_construction,
+    author = "Anders Hejlsberg",
+    title = "Anders Hejlsberg on Modern Compiler Construction",
+    url  = "https://www.youtube.com/watch?v=wSdV1M7n4gQ",
+    keywords = "general"
 }
 
 @article{10.1145/502949.502889,
@@ -140,5 +140,113 @@
     numpages = {13},
     location = {Montreal, Canada},
     series = {SIGPLAN '84}
+}
+
+@online{olle_query_based,
+    author = "Query-based compiler architectures",
+    title = "Olle Fredriksson",
+    url  = "https://ollef.github.io/blog/posts/query-based-compilers.html",
+    year = {2020},
+    month = {06},
+    keywords = "general,incremental,querybased"
+}
+
+@online{rust_blog_incremental_compilation,
+    author = "Michael Woerister",
+    title = "Rust Blog: Incremental Compilation",
+    url  = "https://blog.rust-lang.org/2016/09/08/incremental.html",
+    year = {2016},
+    month = {09},
+    keywords = "incremental"
+}
+
+@online{banderson2020compilationmodel,
+    author = "Brian Anderson",
+    title = "The Rust Compilation Model Calamity",
+    url = "https://en.pingcap.com/blog/rust-compilation-model-calamity/",
+    year = {2020},
+    month = {01},
+    keywords = "rustc",
+}
+
+@online{banderson2020genericscompiletime,
+    author = "Brian Anderson",
+    title = "Generics and Compile-Time in Rust",
+    url = "https://en.pingcap.com/blog/generics-and-compile-time-in-rust/",
+    year = {2020},
+    month = {06},
+    keywords = "rustc",
+}
+
+@online{banderson2020compilationunits,
+    author = "Brian Anderson",
+    title = "Rust’s Huge Compilation Units",
+    url = "https://en.pingcap.com/blog/rust-huge-compilation-units/",
+    year = {2020},
+    month = {06},
+    keywords = "rustc",
+}
+
+@online{banderson2020slowcompilation,
+    author = "Brian Anderson",
+    title = "A Few More Reasons Rust Compiles Slowly",
+    url = "https://en.pingcap.com/blog/reasons-rust-compiles-slowly/",
+    year = {2020},
+    month = {06},
+    keywords = "rustc",
+}
+
+@online{matklad2020threearchitectures,
+    author = "Aleksey Kladov",
+    title = "Three Architectures for a Responsive IDE",
+    url  = "https://rust-analyzer.github.io/blog/2020/07/20/three-architectures-for-responsive-ide.html",
+    year = {2020},
+    month = {07},
+    keywords = "incremental"
+}
+
+@online{matklad2020ramanual,
+    author = "Aleksey Kladov",
+    title = "Rust Analyzer Manual",
+    url  = "https://rust-analyzer.github.io/manual.html#features",
+    year = {2020},
+    month = {07},
+    keywords = "incremental"
+}
+
+@online{matklad2020ramanual,
+    author = "Aleksey Kladov",
+    title = "Rust Analyzer in 2018 and 2019",
+    url  = "https://ferrous-systems.com/blog/rust-analyzer-2019/#rls",
+    year = {2019},
+    month = {12},
+    keywords = "incremental"
+}
+
+@online{niko2019responsive,
+    author = "Nicholas Matsakis",
+    title = "Youtube: Responsive compilers - Nicholas Matsakis - PLISS 2019",
+    url = "https://www.youtube.com/watch?v=N6b44kMS6OM",
+    year = {2019},
+    month = {06},
+    keywords = "rustc,incremental",
+}
+
+@online{niko2019salsaworks,
+    author = "Nicholas Matsakis",
+    title = "Youtube: How Salsa Works (2019.01)",
+    url = "https://www.youtube.com/watch?v=_muY4HjSqVw",
+    year = {2019},
+    month = {01},
+    keywords = "salsa",
+}
+
+@online{niko2019salsadepth,
+    author = "Nicholas Matsakis",
+    title = "Youtube: Salsa In More Depth (2019.01)",
+    url = "https://www.youtube.com/watch?v=i_IhACacPRY",
+    year = {2019},
+    month = {01},
+    keywords = "salsa",
 }
 

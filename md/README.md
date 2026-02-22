@@ -179,3 +179,20 @@
 
 ZULIP
 
+
+## MISC
+
+TESINA TODO 
+[x] sacar sutilezas, layering, manejo de errores, manejo de ciclos
+[x] sacar wy not rls, nada, o resumir y sacar subtitlo
+[ ] resumir mas computacion incremental para ir rapido a compilacino incremental , de tres carillas a media 
+[ ] resumir dunbar2016
+[ ] conclusiones
+[ ] resumir como funciona salsa
+[ ] maybe from rdg
+	The Real World: How Persistence Makes Everything Complicated (RDG)
+	A Question Of Stability: Bridging The Gap Between Compilation Sessions (RDG)
+
+importante
+	que quede reflejado al final de la parte de salsa, la opinion de todo
+	cerrar salsa con opiniones

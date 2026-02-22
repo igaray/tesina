@@ -892,8 +892,6 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
 
 # Recovery from day one
 
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
   What can be done instead, which is not a lot harder and much nicer, is to introduce some kind of sentinel value that indicates an error, but also be returned and allow the compilation process to continue. 
 
   - Create a sentinel value that means "bad user code here"
@@ -911,11 +909,12 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
 
   There have been subtle bugs introduced when the sentinel value is returned but the error has not been actually reported, usually because the error is expected to be reported by some other, later phase in the compiler and that phase ends up being skipped because of the error sentinel. 
   The phase is skipped because it is known an error was already encountered, and we want to avoid reporting errors in duplicate.
+  
   The invariant of reporting errors where and when they occur and only producing sentinel values after the report makes it clear that later, if you receive a sentinel, reporting is not necessary. 
 
 # Example: error type
 
-  so this might be an example of you know just basically whenever you make something that represents a type or whatever just include an error in there
+  E.g. whenever a type is represented, include an error value in its representation.
 
   ```rust
   enum Type {
@@ -925,12 +924,15 @@ Nicholas will discuss some of the work the Rust team has been doing on restructu
   }
   ```
 
-  so now you can have integer character or error and propagated along
+  When a type checking error occurs, the error value can be produced and propagated up the call chain.
 
 # Diminishing returns
 
-  and that the thing that the main problem here is you get to this point of sort of diminishing returns of how much precision
-  if you really want to take this notion of an error sentinel all the way I mean the goal is basically to never give users an error
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MARK >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+  The main problem with this approach is that there is a point of diminishing returns, with regard to how much precision
+  if you really want to take this notion of an error sentinel all the way 
+  I mean the goal is basically to never give users an error that is
   if you saw an error earlier on, you never want to put a second error related to that code because you really don't know what's happening
   however that can be difficult
 
